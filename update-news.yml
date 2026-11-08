@@ -1,0 +1,40 @@
+name: Update kernel news
+
+on:
+  schedule:
+    # 00:50 and 12:50 UTC = 6:20 AM and 6:20 PM IST
+    - cron: "50 0,12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-news
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch kernel releases and LWN headlines
+        run: python scripts/update_news.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add news.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update kernel news $(TZ=Asia/Kolkata date '+%d %b %Y %H:%M IST')"
+            git pull --rebase
+            git push
+          fi
