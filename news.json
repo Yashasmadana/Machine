@@ -1,0 +1,27 @@
+{
+ "updated": "2026-11-08T14:00+05:30",
+ "kernels": [
+  {"moniker": "mainline", "version": "7.4-rc1", "date": "2026-11-01", "eol": false, "link": "https://git.kernel.org/torvalds/h/v7.4-rc1"},
+  {"moniker": "stable", "version": "7.3.3", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.3"},
+  {"moniker": "stable", "version": "7.2.15", "date": "2026-11-01", "eol": true, "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.2.15"},
+  {"moniker": "longterm", "version": "6.18.62", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.62"},
+  {"moniker": "longterm", "version": "6.12.116", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.116"},
+  {"moniker": "longterm", "version": "6.6.162", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.6.162"},
+  {"moniker": "longterm", "version": "6.1.192", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.1.192"},
+  {"moniker": "longterm", "version": "5.15.225", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.225"},
+  {"moniker": "longterm", "version": "5.10.274", "date": "2026-11-06", "eol": false, "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.10.274"},
+  {"moniker": "linux-next", "version": "next-20261105", "date": "2026-11-05", "eol": false, "link": "https://git.kernel.org/next/linux-next/h/next-20261105"}
+ ],
+ "lwn": [
+  {"t": "Asahi Linux 7.3 progress report", "link": "https://lwn.net/Articles/1105936/", "date": "2026-11-07T15:19+05:30", "subscriber": false},
+  {"t": "Amutable Foundations: A Technical Overview", "link": "https://lwn.net/Articles/1105934/", "date": "2026-11-07T15:02+05:30", "subscriber": false},
+  {"t": "Videos from XDC 2026 are available", "link": "https://lwn.net/Articles/1105913/", "date": "2026-11-07T01:55+05:30", "subscriber": false},
+  {"t": "Locking down hibernation for the winter", "link": "https://lwn.net/Articles/1103190/", "date": "2026-11-07T00:21+05:30", "subscriber": true},
+  {"t": "Seven stable kernels with fixes for three Xen vulnerabilities", "link": "https://lwn.net/Articles/1105902/", "date": "2026-11-07T00:18+05:30", "subscriber": false},
+  {"t": "Two stable kernels for Friday", "link": "https://lwn.net/Articles/1105899/", "date": "2026-11-06T23:39+05:30", "subscriber": false},
+  {"t": "User namespaces + file capabilities = trouble", "link": "https://lwn.net/Articles/1103429/", "date": "2026-11-05T20:03+05:30", "subscriber": true},
+  {"t": "Critical security vulnerability affects OpenSSH on Alpine Linux systems", "link": "https://lwn.net/Articles/1105464/", "date": "2026-11-05T17:09+05:30", "subscriber": false},
+  {"t": "LWN.net Weekly Edition for November 5, 2026", "link": "https://lwn.net/Articles/1103480/", "date": "2026-11-05T06:12+05:30", "subscriber": true},
+  {"t": "Plasma X11 session removal surprises some Fedora users", "link": "https://lwn.net/Articles/1105130/", "date": "2026-11-04T22:03+05:30", "subscriber": true}
+ ]
+}
