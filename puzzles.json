@@ -1,0 +1,368 @@
+[
+ {
+  "id": "p01",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Struct padding and a flexible array member",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n#include <stddef.h>\n#include <stdint.h>\n\nstruct a { char c1; int i; char c2; };\nstruct b { int i; char c1; char c2; };\n\nstruct pkt {\n    uint32_t seq;\n    uint8_t  type;\n    uint8_t  data[];\n};\n\nint main(void)\n{\n    printf(\"%zu %zu\\n\", sizeof(struct a), sizeof(struct b));\n    printf(\"%zu %zu\\n\", sizeof(struct pkt), offsetof(struct pkt, data));\n    return 0;\n}",
+  "question": "What does this print on x86_64 Linux (gcc, LP64)?",
+  "answer": "Output: <code>12 8</code> then <code>8 5</code>.\n<b>struct a</b>: <code>c1</code> at 0, 3 bytes padding so <code>int i</code> is 4-aligned at 4, <code>c2</code> at 8, then 3 bytes tail padding so arrays of the struct stay aligned: 12. <b>struct b</b> puts the int first and packs both chars at 4 and 5, tail-padded to 8. Ordering members largest-first is a free size win in hot structures.\n<b>struct pkt</b>: the flexible array member contributes nothing to <code>sizeof</code>, but the struct still gets tail padding to its 4-byte alignment, so <code>sizeof</code> is 8 while <code>data</code> starts at offset 5. <code>malloc(sizeof(struct pkt) + n)</code> is safe (it just over-allocates 3 bytes); <code>offsetof(struct pkt, data) + n</code> is the tight size (the kernel's <code>struct_size()</code> helper does this with overflow checking). Layout is ABI-defined, so never send such a struct over the wire without <code>__packed</code> or explicit serialisation."
+ },
+ {
+  "id": "p02",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Stats lock shared with an IRQ handler",
+  "difficulty": 2,
+  "code": "static DEFINE_SPINLOCK(stats_lock);\nstatic u64 rx_bytes;\n\nstatic irqreturn_t mydev_irq(int irq, void *dev_id)\n{\n    struct mydev *md = dev_id;\n    u32 n = readl(md->regs + RX_COUNT);\n\n    spin_lock(&stats_lock);\n    rx_bytes += n;\n    spin_unlock(&stats_lock);\n    return IRQ_HANDLED;\n}\n\nstatic ssize_t stats_show(struct device *dev,\n                          struct device_attribute *attr, char *buf)\n{\n    u64 val;\n\n    spin_lock(&stats_lock);\n    val = rx_bytes;\n    spin_unlock(&stats_lock);\n    return sysfs_emit(buf, \"%llu\\n\", val);\n}",
+  "question": "This driver occasionally locks up a CPU solid when someone reads the sysfs file under traffic. Why, and what is the fix?",
+  "answer": "<b>Deadlock against its own interrupt.</b> <code>stats_show()</code> runs in process context and takes <code>stats_lock</code> with plain <code>spin_lock()</code>, leaving local interrupts enabled. If the device interrupt arrives on the same CPU while the lock is held, <code>mydev_irq()</code> spins on <code>stats_lock</code> forever: the holder it is waiting for cannot run again until the handler returns.\n<b>Fix:</b> in process context use <code>spin_lock_irqsave(&amp;stats_lock, flags)</code> / <code>spin_unlock_irqrestore(&amp;stats_lock, flags)</code> (or <code>spin_lock_irq()</code> if you know IRQs are enabled on entry). The hard-IRQ handler can keep plain <code>spin_lock()</code>, because handlers run with local interrupts disabled. Lockdep catches this immediately as inconsistent {IN-HARDIRQ-W} -&gt; {HARDIRQ-ON-W} usage. The rule: if a lock is ever taken in hard-IRQ context, every other acquisition must disable IRQs (and use <code>_bh</code> if it is shared with softirq)."
+ },
+ {
+  "id": "p03",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Arrays, pointers and decay",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n\nstatic void show(int arr[10])\n{\n    printf(\"%zu\\n\", sizeof(arr));\n}\n\nint main(void)\n{\n    int a[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};\n    int *p = a;\n\n    printf(\"%zu %zu\\n\", sizeof(a), sizeof(p));\n    show(a);\n    printf(\"%td\\n\", (char *)(&a + 1) - (char *)a);\n    printf(\"%td\\n\", (char *)(p + 1) - (char *)p);\n    printf(\"%d\\n\", *((int *)(&a + 1) - 1));\n    return 0;\n}",
+  "question": "What does this print on x86_64 Linux (gcc, LP64)?",
+  "answer": "Output: <code>40 8</code>, <code>8</code>, <code>40</code>, <code>4</code>, <code>9</code>.\n<code>sizeof(a)</code> is the whole array (10 x 4). <code>sizeof(p)</code> is a pointer (8). Inside <code>show()</code>, the parameter <code>int arr[10]</code> is silently rewritten to <code>int *arr</code>, so <code>sizeof(arr)</code> is 8; the <code>10</code> is ignored. gcc warns with <code>-Wsizeof-array-argument</code>, and this is exactly how <code>memset(arr, 0, sizeof(arr))</code> bugs get into drivers. Always pass the length separately (the kernel's <code>ARRAY_SIZE()</code> even refuses to compile on a pointer).\n<code>&amp;a</code> has type <code>int (*)[10]</code>, so <code>&amp;a + 1</code> steps a whole array, 40 bytes; <code>p + 1</code> steps one <code>int</code>, 4 bytes. Converting <code>&amp;a + 1</code> to <code>int *</code> and stepping back one gives the last element, 9."
+ },
+ {
+  "id": "p04",
+  "track": "Networking",
+  "kind": "predict",
+  "title": "The port you actually bound",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <netinet/in.h>\n\nint main(void)\n{\n    struct sockaddr_in a, b;\n\n    memset(&a, 0, sizeof(a));\n    a.sin_family = AF_INET;\n    a.sin_port = 8080;                 /* forgot htons */\n    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);\n\n    memset(&b, 0, sizeof(b));\n    b.sin_family = AF_INET;\n    b.sin_port = htons(8080);\n    inet_pton(AF_INET, \"10.0.0.1\", &b.sin_addr);\n\n    printf(\"%u %u\\n\", ntohs(a.sin_port), ntohs(b.sin_port));\n    printf(\"%08x\\n\", b.sin_addr.s_addr);\n    printf(\"%04x\\n\", htons(0x1234));\n    return 0;\n}",
+  "question": "What does this print on x86_64? Which port would a bind() with <code>a</code> really listen on?",
+  "answer": "Output: <code>36895 8080</code>, <code>0100000a</code>, <code>3412</code>.\n<code>sin_port</code> and <code>s_addr</code> are stored in <b>network byte order</b> (big-endian). Writing <code>8080</code> (0x1F90) directly on a little-endian host puts bytes <code>90 1F</code> in memory, which the network reads as 0x901F = <b>36895</b>. So <code>bind()</code> with <code>a</code> silently listens on port 36895, and <code>ss -ltn</code> shows the surprise. With <code>htons(8080)</code> the round trip gives 8080.\n<code>inet_pton()</code> writes the bytes <code>0a 00 00 01</code>; read as a native little-endian <code>uint32_t</code> that is <code>0x0100000a</code>. Never compare or mask <code>s_addr</code> against host-order constants without <code>ntohl()</code>. <code>htons(0x1234)</code> just swaps the bytes on x86. On a big-endian CPU all these macros are no-ops, which is why the bug hides on PowerPC/MIPS boards and appears on ARM/x86. <code>INADDR_LOOPBACK</code> is host-order, hence the <code>htonl()</code>."
+ },
+ {
+  "id": "p05",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Integer promotion and shifts on small types",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n#include <stdint.h>\n\nint main(void)\n{\n    uint8_t c = 0xFF;\n    uint8_t r = 0x81;\n    uint8_t a = 200, b = 100;\n\n    if (~c == 0)\n        printf(\"zero\\n\");\n    else\n        printf(\"~c = %d\\n\", ~c);\n\n    uint8_t s = r << 1;\n    int t = r << 1;\n    printf(\"%u %d\\n\", s, t);\n\n    uint8_t sum8 = a + b;\n    printf(\"%d %u\\n\", a + b, sum8);\n    printf(\"%zu\\n\", sizeof(c + c));\n    return 0;\n}",
+  "question": "What does this print on x86_64 Linux (gcc, LP64)?",
+  "answer": "Output: <code>~c = -256</code>, <code>2 258</code>, <code>300 44</code>, <code>4</code>.\nBefore any arithmetic, <code>uint8_t</code> and <code>uint16_t</code> operands are promoted to <b>int</b>. <code>~c</code> is <code>~0x000000FF</code> = <code>0xFFFFFF00</code> = -256, never 0, so a check like <code>if (~status == 0)</code> on a byte register is always false. Write <code>(uint8_t)~c</code> or <code>c == 0xFF</code>.\n<code>r &lt;&lt; 1</code> is computed in int as 258 (0x102); stored back into a <code>uint8_t</code> it is truncated modulo 256 to 2, but kept in an <code>int</code> it stays 258. Likewise <code>a + b</code> is 300 in int and 44 after truncation. <code>sizeof(c + c)</code> is <code>sizeof(int)</code>.\nRelated shift traps: <code>1 &lt;&lt; 31</code> overflows a signed int (undefined behaviour in C), and shifting by the type width or more, e.g. <code>1u &lt;&lt; 32</code>, is undefined. Use <code>1u &lt;&lt; n</code>, <code>1ULL &lt;&lt; n</code> or the kernel's <code>BIT()</code> / <code>BIT_ULL()</code>."
+ },
+ {
+  "id": "p06",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "A sysfs-style write handler",
+  "difficulty": 2,
+  "code": "#define CMD_MAX 32\n\nstatic ssize_t ctl_write(struct file *file, const char __user *ubuf,\n                         size_t count, loff_t *ppos)\n{\n    char cmd[CMD_MAX];\n    struct mydev *md = file->private_data;\n\n    copy_from_user(cmd, ubuf, count);\n    cmd[count] = '\\0';\n\n    if (!strcmp(cmd, \"reset\\n\"))\n        mydev_reset(md);\n    else if (!strncmp(cmd, \"rate \", 5))\n        md->rate = simple_strtoul(cmd + 5, NULL, 10);\n    else\n        return -EINVAL;\n\n    return count;\n}",
+  "question": "Find the bugs in this character-device write() handler. Which one is a security hole?",
+  "answer": "<b>1. Stack buffer overflow (the security hole).</b> <code>count</code> comes from userspace and is never checked, so <code>write(fd, buf, 4096)</code> smashes the kernel stack. Even <code>count == CMD_MAX</code> makes <code>cmd[count] = '\\0'</code> write one past the end. Add <code>if (count == 0 || count &gt;= CMD_MAX) return -EINVAL;</code>.\n<b>2. Return value of <code>copy_from_user()</code> ignored.</b> It returns the number of bytes not copied (not an errno). On a bad user pointer the buffer is partly uninitialised stack and gets parsed anyway. Use <code>if (copy_from_user(cmd, ubuf, count)) return -EFAULT;</code>.\n<b>3. Fragile parsing.</b> <code>simple_strtoul()</code> is deprecated and silently accepts garbage; use <code>kstrtouint()</code> and propagate its error. <code>strcmp</code> with a literal newline also rejects <code>echo -n reset</code>; <code>sysfs_streq()</code> handles that.\nSimplest robust pattern: <code>cmd = memdup_user_nul(ubuf, count);</code> after a size check, then <code>kfree()</code> it."
+ },
+ {
+  "id": "p07",
+  "track": "Embedded",
+  "kind": "explain",
+  "title": "Works at -O0, hangs at -O2",
+  "difficulty": 1,
+  "code": "#include <stdint.h>\n\n#define UART_BASE   0x40011000u\n#define UART_SR     (*(uint32_t *)(UART_BASE + 0x00))\n#define UART_DR     (*(uint32_t *)(UART_BASE + 0x04))\n#define SR_TXE      (1u << 7)\n\nstatic int tx_done;                    /* set to 1 in the UART ISR */\n\nvoid uart_putc(char c)\n{\n    while (!(UART_SR & SR_TXE))\n        ;\n    UART_DR = c;\n}\n\nvoid uart_send_and_wait(const char *s)\n{\n    tx_done = 0;\n    while (*s)\n        uart_putc(*s++);\n    while (!tx_done)\n        ;\n}",
+  "question": "This bare-metal UART code works in a debug build but hangs forever in a release (-O2) build. Explain exactly what the optimiser is allowed to do, and fix it.",
+  "answer": "Nothing tells the compiler that <code>UART_SR</code> or <code>tx_done</code> can change behind its back. Under the C abstract machine, a plain object only changes when this thread writes it, so at -O2 the compiler may <b>load <code>UART_SR</code> once</b> and turn the poll into <code>if (!(sr &amp; TXE)) for (;;);</code>. The same applies to <code>while (!tx_done)</code>: nothing in the loop writes it, so it becomes an infinite loop. Consecutive writes to <code>UART_DR</code> may also be merged or dropped as dead stores.\n<b>Fix:</b> declare hardware registers through <code>volatile</code> pointers, e.g. <code>(*(volatile uint32_t *)(UART_BASE + 0x00))</code> (CMSIS <code>__IO</code> does this), and make the ISR flag <code>volatile</code> (or a C11 atomic). <code>volatile</code> forces every access to really happen, in program order relative to other volatile accesses. It does <b>not</b> make read-modify-write atomic or order normal memory against DMA. In Linux use <code>readl()</code>/<code>writel()</code> for MMIO and <code>READ_ONCE()</code>/<code>WRITE_ONCE()</code> plus proper locking for shared flags."
+ },
+ {
+  "id": "p08",
+  "track": "C & systems",
+  "kind": "write",
+  "title": "Reverse a singly linked list",
+  "difficulty": 1,
+  "code": "#include <stddef.h>\n\nstruct node {\n    int val;\n    struct node *next;\n};\n\n/*\n * Reverse the list in place (no allocation) and return the new head.\n * reverse(NULL) must return NULL.\n * 1 -> 2 -> 3 -> NULL   becomes   3 -> 2 -> 1 -> NULL\n */\nstruct node *reverse(struct node *head);",
+  "question": "Implement <code>reverse()</code> iteratively in O(n) time and O(1) extra space.",
+  "answer": "Walk the list once with three pointers: <code>prev</code> (the already-reversed part), <code>head</code> (the current node) and <code>next</code> (saved before you overwrite <code>head-&gt;next</code>). At each step point the current node back at <code>prev</code>, then advance both. When <code>head</code> becomes NULL, <code>prev</code> is the old tail and therefore the new head. Empty and single-node lists fall out naturally with no special cases.\nThe classic mistake is advancing with <code>head = head-&gt;next</code> after rewriting <code>head-&gt;next</code>, which jumps backwards and loses the rest of the list. Interviewers often follow up with: do it recursively (O(n) stack, risky in the kernel's small 8-16 KB stacks), or reverse a <code>struct list_head</code> doubly linked list, where you swap <code>next</code> and <code>prev</code> in every node including the head.",
+  "solution": "struct node *reverse(struct node *head)\n{\n    struct node *prev = NULL;\n\n    while (head) {\n        struct node *next = head->next;   /* save before overwriting */\n\n        head->next = prev;                /* flip the link */\n        prev = head;                      /* advance prev */\n        head = next;                      /* advance head */\n    }\n    return prev;                          /* old tail is the new head */\n}"
+ },
+ {
+  "id": "p09",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Signed meets unsigned",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n#include <string.h>\n\nint main(void)\n{\n    int i = -1;\n    unsigned int u = 1;\n    const char *msg = \"hi\";\n\n    printf(\"%s\\n\", i < u ? \"less\" : \"greater\");\n    printf(\"%s\\n\", i < (int)u ? \"less\" : \"greater\");\n\n    if (strlen(msg) - 3 > 0)\n        printf(\"long\\n\");\n    else\n        printf(\"short\\n\");\n\n    long l = -1;\n    printf(\"%s\\n\", l < u ? \"less\" : \"greater\");\n    return 0;\n}",
+  "question": "What does this print on x86_64 Linux (gcc, LP64)?",
+  "answer": "Output: <code>greater</code>, <code>less</code>, <code>long</code>, <code>less</code>.\n<b>1.</b> <code>int</code> vs <code>unsigned int</code>: the usual arithmetic conversions turn -1 into <code>UINT_MAX</code> (4294967295), so <code>-1 &lt; 1u</code> is false. <b>2.</b> With the cast both sides are signed, so the comparison is mathematical.\n<b>3.</b> <code>strlen()</code> returns <code>size_t</code> (unsigned), so <code>2 - 3</code> wraps to 18446744073709551615 and the test is always true. Write <code>strlen(msg) &gt; 3</code>. The same pattern, <code>if (len - hdr_len &gt; 0)</code>, is a classic packet-parsing underflow that turns into an out-of-bounds read.\n<b>4.</b> On LP64, <code>long</code> is 64-bit and can represent every <code>unsigned int</code> value, so <code>u</code> converts to <code>long</code> and -1 &lt; 1 is true. On a 32-bit ARM board (ILP32) <code>long</code> and <code>unsigned int</code> are both 32-bit and the answer flips to <code>greater</code>. Enable <code>-Wextra</code> (<code>-Wsign-compare</code>), which <code>-Wall</code> alone does not turn on for C."
+ },
+ {
+  "id": "p10",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Expiring requests from a list",
+  "difficulty": 2,
+  "code": "struct req {\n    struct list_head list;\n    unsigned long deadline;\n    int id;\n};\n\nstatic LIST_HEAD(pending);\nstatic DEFINE_SPINLOCK(pending_lock);\n\nstatic void expire_requests(void)\n{\n    struct req *r;\n    unsigned long flags;\n\n    spin_lock_irqsave(&pending_lock, flags);\n    list_for_each_entry(r, &pending, list) {\n        if (time_after(jiffies, r->deadline)) {\n            list_del(&r->list);\n            kfree(r);\n        }\n    }\n    spin_unlock_irqrestore(&pending_lock, flags);\n}",
+  "question": "This oopses as soon as a request expires. What is wrong and how do you fix it?",
+  "answer": "<code>list_for_each_entry()</code> computes the next element from <code>r-&gt;list.next</code> after the loop body runs. The body has just done <code>list_del()</code>, which sets <code>next</code>/<code>prev</code> to <code>LIST_POISON1</code>/<code>LIST_POISON2</code>, and then <code>kfree(r)</code>. So the iterator dereferences freed, poisoned memory: a use-after-free that usually oopses at an address like <code>dead000000000100</code>.\n<b>Fix:</b> use the safe variant, which caches the next node before the body runs:\n<code>struct req *r, *tmp;</code>\n<code>list_for_each_entry_safe(r, tmp, &amp;pending, list) { ... }</code>\nNote that <code>_safe</code> only protects against deleting the current entry. It is not a substitute for the lock against concurrent modification. A nicer pattern for heavier cleanup is to <code>list_move()</code> expired entries onto a local list under the lock, drop the lock, then free them, so the IRQ-disabled section stays short."
+ },
+ {
+  "id": "p11",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Macros without parentheses",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n\n#define SQUARE(x)  x * x\n#define DOUBLE(x)  (x) + (x)\n#define MAX(a, b)  ((a) > (b) ? (a) : (b))\n\nint main(void)\n{\n    int i = 3;\n    int j = 5;\n\n    printf(\"%d\\n\", SQUARE(1 + 2));\n    printf(\"%d\\n\", 10 / DOUBLE(5));\n    printf(\"%d\\n\", MAX(i++, j));\n    printf(\"%d %d\\n\", i, j);\n    return 0;\n}",
+  "question": "What does this print?",
+  "answer": "Output: <code>5</code>, <code>7</code>, <code>5</code>, <code>4 5</code>.\nMacros are textual substitution. <code>SQUARE(1 + 2)</code> becomes <code>1 + 2 * 1 + 2</code> = 5, not 9: parenthesise every parameter. <code>10 / DOUBLE(5)</code> becomes <code>10 / (5) + (5)</code> = 7, not 1: parenthesise the whole body too, i.e. <code>((x) + (x))</code>.\n<code>MAX(i++, j)</code> expands to <code>((i++) &gt; (j) ? (i++) : (j))</code>. The <code>?:</code> has a sequence point after the condition, so this is well defined: 3 &gt; 5 is false, the result is <code>j</code> = 5, and <code>i</code> was incremented once to 4. Had the condition been true, <code>i</code> would have been incremented <b>twice</b>. That double evaluation is why the kernel's <code>max()</code>/<code>min()</code> use statement expressions with temporaries and type checks, and why you should prefer <code>static inline</code> functions over function-like macros wherever the type is known."
+ },
+ {
+  "id": "p12",
+  "track": "Networking",
+  "kind": "bug",
+  "title": "Reading a length-prefixed TCP message",
+  "difficulty": 2,
+  "code": "#include <stdint.h>\n#include <sys/socket.h>\n\n/* Wire format: 4-byte big-endian length, then 'length' payload bytes. */\nint read_msg(int fd, char *buf, size_t bufsz)\n{\n    uint32_t len;\n\n    if (recv(fd, &len, sizeof(len), 0) != sizeof(len))\n        return -1;\n\n    if (recv(fd, buf, len, 0) < 0)\n        return -1;\n\n    return len;\n}",
+  "question": "This works on loopback in testing and fails randomly in the field. Find all the bugs.",
+  "answer": "<b>1. Partial reads.</b> TCP is a byte stream. <code>recv()</code> returns whatever is available, from 1 byte up to the request, so both the header and the payload can arrive in pieces. The second call may return fewer than <code>len</code> bytes and the function still claims success. Loop until the full count arrives; treat a return of 0 as peer closed and retry on <code>EINTR</code>.\n<b>2. Byte order.</b> <code>len</code> is big-endian on the wire. Use <code>len = ntohl(len)</code>.\n<b>3. Buffer overflow.</b> <code>len</code> is attacker-controlled and never checked against <code>bufsz</code>.\nFix sketch: <code>static int recv_all(int fd, void *p, size_t n) { while (n) { ssize_t r = recv(fd, p, n, 0); if (r == 0) return -1; if (r &lt; 0) { if (errno == EINTR) continue; return -1; } p = (char *)p + r; n -= r; } return 0; }</code>, then check <code>ntohl(len) &lt;= bufsz</code> before reading the payload."
+ },
+ {
+  "id": "p13",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Why do { } while (0)?",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n\n#define LOG_INC(x)  printf(\"inc %d\\n\", x); (x)++\n\nint main(void)\n{\n    int n = 0;\n    int debug = 0;\n\n    if (debug)\n        LOG_INC(n);\n\n    printf(\"n = %d\\n\", n);\n\n    for (int k = 0; k < 2; k++)\n        LOG_INC(n);\n\n    printf(\"n = %d\\n\", n);\n    return 0;\n}",
+  "question": "What does this print? How should <code>LOG_INC</code> be written?",
+  "answer": "Output: <code>n = 1</code>, <code>inc 1</code>, <code>inc 1</code>, <code>n = 2</code>.\nThe macro expands to <b>two statements</b>. Under an unbraced <code>if</code> or <code>for</code>, only the first one (<code>printf</code>) is controlled. So with <code>debug == 0</code> the print is skipped but <code>(n)++</code> still runs, giving 1. In the loop, <code>printf</code> runs twice (printing the unchanged <code>n</code> = 1) and the increment runs once after the loop, giving 2.\nFix: <code>#define LOG_INC(x) do { printf(\"inc %d\\n\", (x)); (x)++; } while (0)</code>. The <code>do { } while (0)</code> wrapper makes the macro a single statement that still requires a trailing semicolon. Plain braces <code>{ ... }</code> are not enough: <code>if (c) LOG_INC(n); else ...</code> would then fail to compile because of the extra <code>;</code> before <code>else</code>. This is why almost every multi-statement macro in the kernel uses this idiom. gcc's <code>-Wall</code> already flags this code via <code>-Wmultistatement-macros</code>."
+ },
+ {
+  "id": "p14",
+  "track": "Kernel",
+  "kind": "write",
+  "title": "Implement container_of",
+  "difficulty": 2,
+  "code": "#include <stddef.h>\n\nstruct list_head {\n    struct list_head *next, *prev;\n};\n\nstruct netdev_priv {\n    int ifindex;\n    char name[16];\n    struct list_head link;\n};\n\n/*\n * Given 'ptr', a pointer to field 'member' embedded inside an object of\n * type 'type', return a pointer to the enclosing object.\n *\n * struct list_head *l = ...;\n * struct netdev_priv *p = container_of(l, struct netdev_priv, link);\n */\n#define container_of(ptr, type, member)  /* ??? */",
+  "question": "Write the <code>container_of</code> macro. Bonus: why does the arithmetic go through <code>char *</code>?",
+  "answer": "<code>offsetof(type, member)</code> is the byte distance from the start of <code>type</code> to <code>member</code>. Subtract it from the member's address and cast back: <code>((type *)((char *)(ptr) - offsetof(type, member)))</code>.\nThe <code>char *</code> cast matters because pointer arithmetic is scaled by the pointee size: subtracting 24 from a <code>struct list_head *</code> would move back 24 x 16 bytes. <code>char</code> is the only type with size 1 by definition (arithmetic on <code>void *</code> is a GNU extension).\nThis is how intrusive data structures work in the kernel: <code>list_head</code>, <code>rb_node</code>, <code>kref</code>, <code>work_struct</code> and <code>timer_list</code> are embedded in your object, and callbacks get the embedded pointer back. <code>list_entry()</code>, <code>from_timer()</code> and <code>to_platform_device()</code> are all <code>container_of</code> wrappers. The real kernel macro adds a <code>static_assert</code> that <code>*ptr</code> has the member's type, so passing the wrong field fails at build time instead of corrupting memory.",
+  "solution": "#define container_of(ptr, type, member) \\\n    ((type *)((char *)(ptr) - offsetof(type, member)))\n\n/* Kernel-style version with a compile-time type check (GNU C): */\n#define container_of_checked(ptr, type, member) ({                 \\\n    void *__mptr = (void *)(ptr);                                  \\\n    _Static_assert(__builtin_types_compatible_p(typeof(*(ptr)),    \\\n                   typeof(((type *)0)->member)),                   \\\n                   \"pointer type mismatch in container_of()\");     \\\n    ((type *)((char *)__mptr - offsetof(type, member))); })"
+ },
+ {
+  "id": "p15",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "*p++ and friends",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n\nint main(void)\n{\n    int a[] = {10, 20, 30, 40};\n    int *p = a;\n    int x, y, z;\n\n    x = *p++;\n    y = (*p)++;\n    z = *++p;\n\n    printf(\"%d %d %d\\n\", x, y, z);\n    printf(\"%d %d %d %d\\n\", a[0], a[1], a[2], a[3]);\n    printf(\"%td\\n\", p - a);\n    return 0;\n}",
+  "question": "What does this print?",
+  "answer": "Output: <code>10 20 30</code>, <code>10 21 30 40</code>, <code>2</code>.\nPostfix <code>++</code> binds tighter than unary <code>*</code>, so <code>*p++</code> means <code>*(p++)</code>: read <code>a[0]</code> (10), then move <code>p</code> to <code>a[1]</code>. This is the idiom behind <code>while (n--) *dst++ = *src++;</code>.\n<code>(*p)++</code> increments the pointee: <code>y</code> gets the old value 20 and <code>a[1]</code> becomes 21; <code>p</code> does not move.\n<code>*++p</code> means <code>*(++p)</code>: advance to <code>a[2]</code> first, then read 30. <code>p - a</code> is 2 elements (a <code>ptrdiff_t</code>, printed with <code>%td</code>).\nWhen reading driver code, the one to watch is <code>(*p)++</code> vs <code>*p++</code>: a missing pair of parentheses silently turns \"bump a counter\" into \"skip to the next element\", and the compiler only warns about the unused value if you are lucky."
+ },
+ {
+  "id": "p16",
+  "track": "Embedded",
+  "kind": "bug",
+  "title": "GPIO register shared with an ISR",
+  "difficulty": 2,
+  "code": "#include <stdint.h>\n\n#define GPIO_ODR  (*(volatile uint32_t *)0x48000014u)\n#define LED_PIN   5\n#define CS_PIN    9\n\n/* Called from the main loop around every SPI transfer */\nvoid spi_select(int on)\n{\n    if (on)\n        GPIO_ODR &= ~(1u << CS_PIN);    /* chip select is active-low */\n    else\n        GPIO_ODR |= (1u << CS_PIN);\n}\n\n/* 1 ms SysTick interrupt: blink the status LED at 1 Hz */\nvoid SysTick_Handler(void)\n{\n    static unsigned int ticks;\n\n    if (++ticks == 500) {\n        ticks = 0;\n        GPIO_ODR ^= (1u << LED_PIN);\n    }\n}",
+  "question": "The registers are volatile, yet the status LED occasionally misses a blink under heavy SPI traffic. Why?",
+  "answer": "<b>Read-modify-write race.</b> <code>GPIO_ODR &amp;= ~mask</code> compiles to three steps: load ODR, AND, store ODR. If SysTick fires between the main loop's load and store, the ISR toggles the LED bit, returns, and then the main loop stores its stale copy of ODR, <b>undoing the LED toggle</b>. <code>volatile</code> guarantees each access happens; it does not make the sequence atomic.\n<b>Fixes:</b>\n1. Use the hardware's atomic set/reset register, which is what it exists for. On STM32: <code>GPIOx-&gt;BSRR = 1u &lt;&lt; pin</code> sets and <code>1u &lt;&lt; (pin + 16)</code> clears, in a single write with no read.\n2. Otherwise, disable interrupts around the RMW (<code>__disable_irq()</code>/<code>__enable_irq()</code>, or save and restore PRIMASK), or use bit-banding on Cortex-M3/M4.\nIn Linux the same issue exists between CPUs and contexts: GPIO and pinctrl drivers protect shared registers with a <code>raw_spin_lock_irqsave()</code>, and <code>regmap_update_bits()</code> does the RMW under the regmap lock."
+ },
+ {
+  "id": "p17",
+  "track": "C & systems",
+  "kind": "bug",
+  "title": "Building an interface label",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n#include <ctype.h>\n\n#define NAME_LEN 8\n\nstatic void upcase(char *s)\n{\n    for (; *s; s++)\n        *s = toupper((unsigned char)*s);\n}\n\nstatic int make_label(char *out, const char *ifname, int unit)\n{\n    char buf[NAME_LEN];\n    int i;\n\n    for (i = 0; i <= NAME_LEN && ifname[i]; i++)\n        buf[i] = ifname[i];\n    buf[i] = '\\0';\n    return sprintf(out, \"%s%d\", buf, unit);\n}\n\nint main(void)\n{\n    char *dev = \"eth\";\n    char label[NAME_LEN];\n\n    upcase(dev);\n    make_label(label, dev, 10);\n    printf(\"%s\\n\", label);\n    return 0;\n}",
+  "question": "This compiles cleanly with -Wall and crashes. Find every bug.",
+  "answer": "<b>1. Modifying a string literal.</b> <code>char *dev = \"eth\"</code> points at a literal, which typically lives in read-only <code>.rodata</code>. Writing it in <code>upcase()</code> is undefined behaviour; on Linux it segfaults right here. Use <code>char dev[] = \"eth\";</code> (a writable copy) and declare pointers to literals as <code>const char *</code> so the compiler catches this.\n<b>2. Off-by-one copy.</b> <code>i &lt;= NAME_LEN</code> allows writing <code>buf[8]</code>, and the terminator can then land at <code>buf[9]</code>: up to 2 bytes past an 8-byte array. The bound must be <code>i &lt; NAME_LEN - 1</code> to leave room for the NUL.\n<b>3. Unbounded <code>sprintf</code>.</b> <code>out</code> has no size parameter. A 7-character name plus <code>\"10\"</code> needs 10 bytes in an 8-byte <code>label</code>. Pass the size and use <code>snprintf(out, size, ...)</code>, checking the return for truncation (kernel: <code>scnprintf</code>, <code>strscpy</code>). The fixed-size names here mirror <code>IFNAMSIZ</code> (16) handling in real network code."
+ },
+ {
+  "id": "p18",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Allocating under a spinlock",
+  "difficulty": 2,
+  "code": "struct flow {\n    struct list_head node;\n    u32 key;\n    u64 packets;\n};\n\nstatic LIST_HEAD(flows);\nstatic DEFINE_SPINLOCK(flows_lock);\n\n/* Called for every received packet (softirq context) */\nint flow_account(u32 key)\n{\n    struct flow *f;\n\n    spin_lock_bh(&flows_lock);\n    list_for_each_entry(f, &flows, node) {\n        if (f->key == key) {\n            f->packets++;\n            spin_unlock_bh(&flows_lock);\n            return 0;\n        }\n    }\n\n    f = kmalloc(sizeof(*f), GFP_KERNEL);\n    f->key = key;\n    f->packets = 1;\n    list_add(&f->node, &flows);\n    spin_unlock_bh(&flows_lock);\n    return 0;\n}",
+  "question": "Find the bugs. What will the kernel log say, and what are the two reasonable fixes?",
+  "answer": "<b>1. Sleeping allocation in atomic context.</b> <code>GFP_KERNEL</code> may sleep to reclaim memory, but this code holds a spinlock and is called from softirq. With <code>CONFIG_DEBUG_ATOMIC_SLEEP</code> you get BUG: sleeping function called from invalid context; without it you can get scheduling while atomic or a deadlock.\n<b>2. No NULL check.</b> Under memory pressure <code>kmalloc</code> returns NULL and <code>f-&gt;key</code> oopses.\n<b>Fix A:</b> since this runs in softirq anyway, use <code>GFP_ATOMIC</code>, and on NULL unlock and return <code>-ENOMEM</code> (drop the accounting, never crash the packet path).\n<b>Fix B</b> (process context only): allocate with <code>GFP_KERNEL</code> before taking the lock, re-check under the lock whether another CPU inserted the key meanwhile, and <code>kfree</code> the spare if so.\nAlso: a linear list walk per packet does not scale. Real flow tables use an <code>rhashtable</code> with RCU lookups and per-CPU or atomic counters."
+ },
+ {
+  "id": "p19",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Static locals behind a function-pointer table",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n\nstatic int counter(void)\n{\n    static int n = 10;\n    return n++;\n}\n\nstatic int add(int a, int b) { return a + b + counter(); }\nstatic int sub(int a, int b) { return a - b + counter(); }\nstatic int mul(int a, int b) { return a * b; }\n\nint main(void)\n{\n    int (*ops[])(int, int) = { add, sub, mul };\n    int r = 0;\n\n    for (int i = 0; i < 3; i++)\n        r += ops[i](4, 2);\n\n    printf(\"%d %d\\n\", r, counter());\n    return 0;\n}",
+  "question": "What does this print?",
+  "answer": "Output: <code>37 12</code>.\nA <code>static</code> local has static storage duration: it is initialised <b>once</b> (before <code>main</code>, from a constant expression) and keeps its value between calls. It lives in <code>.data</code>, not on the stack. So successive <code>counter()</code> calls return 10, 11, 12, ...\n<code>ops</code> is an array of pointers to functions taking <code>(int, int)</code> and returning <code>int</code>. The loop calls <code>add(4,2)</code> = 4 + 2 + 10 = 16, <code>sub(4,2)</code> = 2 + 11 = 13 and <code>mul(4,2)</code> = 8, so r = 37. The final <code>counter()</code> returns 12.\nKernel relevance: operation tables like <code>struct file_operations</code> and <code>struct net_device_ops</code> are this pattern with named fields. A hidden <code>static</code> local inside such a callback is shared by every device and every CPU: it is a global with a misleading scope, so it needs locking and breaks as soon as a second device instance probes."
+ },
+ {
+  "id": "p20",
+  "track": "Networking",
+  "kind": "write",
+  "title": "IPv4 header checksum",
+  "difficulty": 2,
+  "code": "#include <stdint.h>\n#include <stddef.h>\n\n/*\n * Compute the IPv4 header checksum (RFC 791 / RFC 1071) over 'len'\n * bytes at 'hdr'. The checksum field in the header is already zero.\n * Return the 16-bit value in network byte order, ready to store\n * directly into iph->check.\n *\n * 'hdr' may be at any alignment (e.g. 14 bytes into an Ethernet frame).\n */\nuint16_t ip_checksum(const void *hdr, size_t len);",
+  "question": "Implement <code>ip_checksum()</code>. Explain the end-around carry, and how a receiver verifies a header.",
+  "answer": "The checksum is the <b>one's complement of the one's-complement sum</b> of the header taken as 16-bit words. Sum into a 32-bit accumulator, then fold: add the bits above 16 back into the low 16 (end-around carry) until nothing is left above bit 15, and invert. Building each word from bytes (<code>p[0] &lt;&lt; 8 | p[1]</code>) avoids unaligned <code>uint16_t</code> loads, which fault or are slow on some ARM/MIPS cores; an Ethernet frame puts the IP header at offset 14.\nExample: the header <code>45 00 00 73 00 00 40 00 40 11 00 00 c0 a8 00 01 c0 a8 00 c7</code> gives <code>b8 61</code>.\nTo verify, the receiver sums the header including the checksum field: a valid header folds to 0xFFFF, so this function returns 0. Since TTL changes at every hop, routers update the checksum incrementally (RFC 1624) instead of recomputing it. In the kernel use <code>ip_fast_csum()</code>/<code>ip_send_check()</code>, and NIC checksum offload for L4.",
+  "solution": "#include <arpa/inet.h>\n\nuint16_t ip_checksum(const void *hdr, size_t len)\n{\n    const uint8_t *p = hdr;\n    uint32_t sum = 0;\n\n    while (len > 1) {                       /* sum big-endian 16-bit words */\n        sum += (uint32_t)p[0] << 8 | p[1];\n        p += 2;\n        len -= 2;\n    }\n    if (len)                                /* odd trailing byte, zero-padded */\n        sum += (uint32_t)p[0] << 8;\n\n    while (sum >> 16)                       /* fold carries back in */\n        sum = (sum & 0xffff) + (sum >> 16);\n\n    return htons((uint16_t)~sum);           /* one's complement of the sum */\n}"
+ },
+ {
+  "id": "p21",
+  "track": "C & systems",
+  "kind": "write",
+  "title": "Power of two: test and round up",
+  "difficulty": 2,
+  "code": "#include <stdbool.h>\n#include <stdint.h>\n\n/* True if x is an exact power of two. 0 is NOT a power of two. */\nbool is_pow2(uint32_t x);\n\n/*\n * Smallest power of two >= x, for 1 <= x <= 0x80000000.\n * roundup_pow2(1) == 1, roundup_pow2(5) == 8, roundup_pow2(64) == 64\n * No loops over individual bits, no floating point.\n */\nuint32_t roundup_pow2(uint32_t x);",
+  "question": "Implement both with bit tricks and explain why they work.",
+  "answer": "<b>Test:</b> a power of two has exactly one set bit. Subtracting 1 clears that bit and sets every bit below it, so <code>x &amp; (x - 1)</code> is zero only for powers of two. It is also zero for <code>x == 0</code>, hence the explicit <code>x != 0</code>. (<code>x &amp; (x - 1)</code> clearing the lowest set bit is also the core of Kernighan's popcount loop.)\n<b>Round up:</b> decrement first so exact powers stay put, then OR the value with itself shifted right by 1, 2, 4, 8 and 16. That copies the highest set bit into every lower position, giving 2^k-1; adding 1 yields 2^k. Five shifts cover 32 bits; add <code>x |= x &gt;&gt; 32</code> for 64-bit. Inputs of 0 or above 0x80000000 wrap to 0.\nKernel equivalents: <code>is_power_of_2()</code>, <code>roundup_pow_of_two()</code>, <code>ilog2()</code>. Ring sizes and hash tables are kept at powers of two so <code>idx &amp; (size - 1)</code> can replace <code>%</code>.",
+  "solution": "bool is_pow2(uint32_t x)\n{\n    return x != 0 && (x & (x - 1)) == 0;\n}\n\nuint32_t roundup_pow2(uint32_t x)\n{\n    x--;                    /* so exact powers map to themselves */\n    x |= x >> 1;            /* smear the highest set bit ...      */\n    x |= x >> 2;\n    x |= x >> 4;\n    x |= x >> 8;\n    x |= x >> 16;           /* ... into every lower position       */\n    return x + 1;\n}\n\n/* GCC/Clang alternative: x <= 1 ? 1 : 1u << (32 - __builtin_clz(x - 1)) */"
+ },
+ {
+  "id": "p22",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Probe without error unwinding",
+  "difficulty": 2,
+  "code": "static int mydev_probe(struct platform_device *pdev)\n{\n    struct mydev *md;\n    struct resource *res;\n    int ret;\n\n    md = kzalloc(sizeof(*md), GFP_KERNEL);\n    if (!md)\n        return -ENOMEM;\n\n    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);\n    md->regs = ioremap(res->start, resource_size(res));\n    if (!md->regs)\n        return -ENOMEM;\n\n    md->irq = platform_get_irq(pdev, 0);\n    ret = request_irq(md->irq, mydev_irq, 0, \"mydev\", md);\n    if (ret)\n        return ret;\n\n    md->clk = clk_get(&pdev->dev, NULL);\n    if (IS_ERR(md->clk))\n        return PTR_ERR(md->clk);\n\n    platform_set_drvdata(pdev, md);\n    return 0;\n}",
+  "question": "List the bugs in this probe() and show the idiomatic fix.",
+  "answer": "<b>Leaks on every error path:</b> failing <code>ioremap</code> leaks <code>md</code>; failing <code>request_irq</code> leaks the mapping and <code>md</code>; failing <code>clk_get</code> (often <code>-EPROBE_DEFER</code>, so probe is retried and leaks every time) also leaves an IRQ handler installed that points at freed memory.\n<b>Unchecked results:</b> <code>res</code> may be NULL; <code>platform_get_irq()</code> returns a negative errno on failure, which is then passed to <code>request_irq</code>.\n<b>Ordering:</b> the IRQ is requested before the clock exists and is enabled, so an early or shared interrupt makes the handler touch unclocked registers. Request the IRQ last, after <code>clk_prepare_enable()</code>.\n<b>Fix:</b> either a goto ladder that unwinds in reverse (<code>err_clk: free_irq(); err_irq: iounmap(); err_map: kfree(md); return ret;</code>), or better, managed resources: <code>devm_kzalloc</code>, <code>devm_platform_ioremap_resource</code>, <code>devm_clk_get_enabled</code>, <code>devm_request_irq</code>, plus <code>return dev_err_probe(dev, ret, ...)</code>. devm releases in reverse order on failure and on remove."
+ },
+ {
+  "id": "p23",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "XOR swap meets aliasing",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n\nstatic void xor_swap(int *a, int *b)\n{\n    *a ^= *b;\n    *b ^= *a;\n    *a ^= *b;\n}\n\nint main(void)\n{\n    int v[] = {3, 7, 9};\n    int i = 0, j = 2;\n\n    xor_swap(&v[i], &v[j]);\n    printf(\"%d %d %d\\n\", v[0], v[1], v[2]);\n\n    j = 0;           /* e.g. a sort that picks the same index */\n    xor_swap(&v[i], &v[j]);\n    printf(\"%d %d %d\\n\", v[0], v[1], v[2]);\n    return 0;\n}",
+  "question": "What does this print?",
+  "answer": "Output: <code>9 7 3</code> then <code>0 7 3</code>.\nWith distinct objects the three XORs swap the values. But when <code>a</code> and <code>b</code> point to the <b>same</b> object, the first line computes <code>x ^ x = 0</code> and stores it in both (they are the same int), and every later step XORs zero with zero. The element is destroyed. This bites in sort and shuffle routines that may swap an element with itself.\nThe \"no temporary\" trick also buys nothing on modern CPUs: the three XORs form a serial dependency chain, whereas a temporary lives in a register and compiles to plain moves (or the swap disappears entirely through register renaming). The arithmetic variant <code>a = a + b; b = a - b; a = a - b;</code> has the same aliasing problem plus signed-overflow undefined behaviour. Write <code>int t = *a; *a = *b; *b = t;</code>, or use the kernel's <code>swap(a, b)</code> macro."
+ },
+ {
+  "id": "p24",
+  "track": "Embedded",
+  "kind": "predict",
+  "title": "Bit-field register maps",
+  "difficulty": 3,
+  "code": "#include <stdio.h>\n#include <stdint.h>\n#include <string.h>\n\n/* Control register, as described in a vendor header */\nstruct ctrl_reg {\n    uint32_t enable : 1;\n    uint32_t mode   : 3;\n    uint32_t        : 4;\n    uint32_t div    : 8;\n    uint32_t irq_en : 1;\n    uint32_t        : 15;\n};\n\nint main(void)\n{\n    struct ctrl_reg r;\n    uint32_t raw;\n\n    memset(&r, 0, sizeof(r));\n    r.enable = 1;\n    r.mode = 5;\n    r.div = 0x2A;\n    r.irq_en = 1;\n    memcpy(&raw, &r, sizeof(raw));\n    printf(\"%zu 0x%08x\\n\", sizeof(r), raw);\n\n    r.mode = 9;\n    memcpy(&raw, &r, sizeof(raw));\n    printf(\"mode=%u 0x%08x\\n\", r.mode, raw);\n    return 0;\n}",
+  "question": "What does this print with gcc on x86_64? Would you use this struct to drive real hardware?",
+  "answer": "Output (gcc, x86_64): <code>4 0x00012a0b</code> then <code>mode=1 0x00012a03</code>.\nThe x86_64 System V ABI allocates bit-fields from the <b>least significant bit</b> up: enable is bit 0, mode bits 1-3 (5 gives 0xA), 4 padding bits, div bits 8-15 (0x2A00), irq_en bit 16, so 0x00012A0B. Assigning 9 to a 3-bit unsigned field keeps the low 3 bits (9 mod 8 = 1); gcc warns <code>-Woverflow</code> at compile time.\nThe C standard leaves allocation order, straddling and the container unit <b>implementation-defined</b>. Big-endian ABIs (PowerPC, MIPS BE, ARM BE) allocate from the MSB, so the same header gives a different register value. The compiler may also access a bit-field with byte or halfword loads, or perform a hidden read-modify-write, which is wrong for registers with write-1-to-clear bits or width-sensitive access. For hardware use explicit masks and shifts on a <code>uint32_t</code> accessed with <code>readl()</code>/<code>writel()</code>, e.g. the kernel's <code>GENMASK()</code>, <code>FIELD_PREP()</code> and <code>FIELD_GET()</code>."
+ },
+ {
+  "id": "p25",
+  "track": "C & systems",
+  "kind": "explain",
+  "title": "Reading const pointer declarations",
+  "difficulty": 1,
+  "code": "int x = 1, y = 2;\n\nconst int *a = &x;           /* (1) */\nint const *b = &x;           /* (2) */\nint *const c = &x;           /* (3) */\nconst int *const d = &x;     /* (4) */\n\nvoid test(void)\n{\n    *a = 10;     /* A */\n    a = &y;      /* B */\n    *b = 10;     /* C */\n    *c = 10;     /* D */\n    c = &y;      /* E */\n    *d = 10;     /* F */\n    d = &y;      /* G */\n}",
+  "question": "Explain what each of declarations (1)-(4) means. Which of the lines A-G fail to compile?",
+  "answer": "Read declarations right to left from the name; <code>const</code> applies to what is immediately to its left (or right, if nothing is on its left).\n<b>(1)</b> and <b>(2)</b> are identical: pointer to const int. You cannot write through the pointer, but you can repoint it: <b>A</b> and <b>C</b> fail, <b>B</b> compiles.\n<b>(3)</b> const pointer to int. You can write the int but not repoint: <b>D</b> compiles, <b>E</b> fails.\n<b>(4)</b> const pointer to const int: <b>F</b> and <b>G</b> both fail.\nSo <b>A, C, E, F, G</b> are errors (gcc: assignment of read-only location / read-only variable); B and D compile.\nNote that <code>const int *</code> only promises you will not modify <code>x</code> through it; <code>x</code> itself can still change. Kernel examples: <code>const struct file_operations</code> (ops tables in read-only memory) and <code>const char __user *buf</code>. Casting const away and writing to an object that was defined const is undefined behaviour."
+ },
+ {
+  "id": "p26",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Polling a sensor from a timer",
+  "difficulty": 2,
+  "code": "struct poller {\n    struct timer_list timer;\n    struct mutex lock;\n    struct i2c_client *client;\n    int last_temp;\n};\n\nstatic void poll_fn(struct timer_list *t)\n{\n    struct poller *p = from_timer(p, t, timer);\n    int val;\n\n    mutex_lock(&p->lock);\n    val = i2c_smbus_read_byte_data(p->client, TEMP_REG);\n    if (val >= 0)\n        p->last_temp = val;\n    mutex_unlock(&p->lock);\n\n    mod_timer(&p->timer, jiffies + msecs_to_jiffies(500));\n}\n\nstatic int poller_start(struct poller *p)\n{\n    mutex_init(&p->lock);\n    timer_setup(&p->timer, poll_fn, 0);\n    mod_timer(&p->timer, jiffies + msecs_to_jiffies(500));\n    return 0;\n}",
+  "question": "What is fundamentally wrong with this design, and what should replace the timer?",
+  "answer": "Timer callbacks run in <b>softirq (atomic) context</b>, where sleeping is forbidden. Both <code>mutex_lock()</code> and an I2C transfer (<code>i2c_smbus_read_byte_data()</code> waits for the bus controller to complete the transfer) can sleep. Expect BUG: sleeping function called from invalid context or scheduling while atomic, and possibly a hang. The same applies to <code>msleep()</code>, <code>GFP_KERNEL</code> allocations and <code>copy_to_user()</code> inside timers, tasklets and hard-IRQ handlers.\n<b>Fix:</b> use a <code>struct delayed_work</code>. Its handler runs in a kworker thread (process context) and may sleep: <code>INIT_DELAYED_WORK(&amp;p-&gt;work, poll_work)</code>; inside the handler, <code>container_of(to_delayed_work(w), struct poller, work)</code>, do the I2C read, then <code>schedule_delayed_work(&amp;p-&gt;work, msecs_to_jiffies(500))</code>.\nAlso handle teardown: a self-rearming timer or work item needs <code>cancel_delayed_work_sync()</code> (for timers <code>timer_shutdown_sync()</code> / <code>del_timer_sync()</code>) in remove(), or it fires after the memory is freed. (Newer kernels rename <code>from_timer()</code> to <code>timer_container_of()</code>.)"
+ },
+ {
+  "id": "p27",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "Endianness through a union",
+  "difficulty": 1,
+  "code": "#include <stdio.h>\n#include <stdint.h>\n\nunion probe {\n    uint32_t word;\n    uint8_t  bytes[4];\n};\n\nint main(void)\n{\n    union probe u = { .word = 0x11223344 };\n\n    printf(\"%02x %02x\\n\", u.bytes[0], u.bytes[3]);\n    printf(\"%s\\n\", u.bytes[0] == 0x44 ? \"little\" : \"big\");\n\n    uint16_t v = 0x0102;\n    uint8_t *p = (uint8_t *)&v;\n    printf(\"%d\\n\", p[0]);\n\n    u.bytes[0] = 0xAA;\n    printf(\"%08x\\n\", u.word);\n    return 0;\n}",
+  "question": "What does this print on x86_64? What would change on a big-endian CPU?",
+  "answer": "Output on x86_64: <code>44 11</code>, <code>little</code>, <code>2</code>, <code>112233aa</code>.\nx86 is <b>little-endian</b>: the least significant byte is stored at the lowest address, so <code>bytes[0]</code> is 0x44 and <code>bytes[3]</code> is 0x11. Viewing <code>v</code> through a <code>uint8_t *</code> shows its low byte 0x02 first. Overwriting byte 0 changes the least significant byte of the word.\nOn a big-endian CPU (classic PowerPC, network processors, some MIPS/ARM BE configurations) the output would be <code>11 44</code>, <code>big</code>, <code>1</code>, <code>aa223344</code>. The program is well defined either way; only the result is implementation-specific.\nReading a different union member than the one last written is allowed in C (the bytes are reinterpreted); it is undefined in C++. In real code don't detect endianness at runtime: use <code>be32_to_cpu()</code>/<code>cpu_to_le16()</code> in the kernel or <code>htonl()</code>/<code>be32toh()</code> in userspace, and annotate kernel types as <code>__be32</code> so <code>sparse</code> catches missing conversions."
+ },
+ {
+  "id": "p28",
+  "track": "Networking",
+  "kind": "predict",
+  "title": "Parsing an IPv4 header from raw bytes",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n#include <stdint.h>\n#include <string.h>\n#include <arpa/inet.h>\n\n/* First 16 bytes of an IPv4 header as received from the wire */\nstatic const uint8_t pkt[] = {\n    0x45, 0x00, 0x00, 0x54, 0x1c, 0x46, 0x40, 0x00,\n    0x40, 0x01, 0xb1, 0xe6, 0xc0, 0xa8, 0x00, 0x01\n};\n\nint main(void)\n{\n    uint16_t raw;\n    uint32_t src;\n\n    memcpy(&raw, pkt + 2, sizeof(raw));\n    printf(\"%u %u\\n\", raw, ntohs(raw));\n\n    printf(\"ihl=%u bytes\\n\", (pkt[0] & 0x0f) * 4);\n    printf(\"ttl=%u proto=%u\\n\", pkt[8], pkt[9]);\n\n    memcpy(&src, pkt + 12, sizeof(src));\n    printf(\"%08x %08x\\n\", src, ntohl(src));\n    return 0;\n}",
+  "question": "What does this print on x86_64? Why <code>memcpy</code> instead of <code>*(uint16_t *)(pkt + 2)</code>?",
+  "answer": "Output: <code>21504 84</code>, <code>ihl=20 bytes</code>, <code>ttl=64 proto=1</code>, <code>0100a8c0 c0a80001</code>.\nTotal length is the bytes <code>00 54</code>. Loaded natively on little-endian x86 that is 0x5400 = 21504; <code>ntohs()</code> gives the real 84 bytes. The source address bytes <code>c0 a8 00 01</code> (192.168.0.1) load as 0x0100a8c0 and <code>ntohl()</code> restores 0xc0a80001. IHL is in 32-bit words: 5 x 4 = 20 bytes. Use it to find the L4 header; options exist. TTL 64, protocol 1 (ICMP).\nWhy <code>memcpy</code>: casting a byte pointer to <code>uint16_t *</code> or <code>struct iphdr *</code> at an arbitrary offset can be <b>misaligned</b> (an IP header sits 14 bytes into an Ethernet frame) and violates strict aliasing. x86 tolerates it; older ARM and MIPS fault or trap. <code>memcpy</code> of a constant size compiles to a single load where that is safe. The kernel uses <code>get_unaligned_be16()</code>, and drivers reserve <code>NET_IP_ALIGN</code> (2 bytes) of headroom so the IP header lands aligned."
+ },
+ {
+  "id": "p29",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "Reference counting a session object",
+  "difficulty": 3,
+  "code": "struct session {\n    struct kref ref;\n    struct list_head node;\n    char name[16];\n};\n\nstatic LIST_HEAD(sessions);\nstatic DEFINE_MUTEX(sess_lock);\n\nstatic void session_release(struct kref *ref)\n{ kfree(container_of(ref, struct session, ref)); }\n\nvoid session_close(struct session *s)\n{\n    mutex_lock(&sess_lock);\n    kref_put(&s->ref, session_release);\n    list_del(&s->node);\n    mutex_unlock(&sess_lock);\n    pr_info(\"closed %s\\n\", s->name);\n}\n\nstruct session *session_find(const char *name)\n{\n    struct session *s;\n\n    mutex_lock(&sess_lock);\n    list_for_each_entry(s, &sessions, node)\n        if (!strcmp(s->name, name))\n            break;\n    mutex_unlock(&sess_lock);\n    return s;\n}",
+  "question": "Find the bugs: there are at least two use-after-free problems and one more lookup bug.",
+  "answer": "<b>1. Use after put in <code>session_close()</code>.</b> <code>kref_put()</code> may drop the last reference and <code>kfree(s)</code>; then <code>list_del(&amp;s-&gt;node)</code> writes freed memory and <code>pr_info</code> reads <code>s-&gt;name</code> from it. After a put you no longer own the object. Copy what you need first; unlink from the list inside the release function (with <code>kref_put_mutex()</code> or under the lock), or <code>list_del()</code> before the put if the list's reference is the one being dropped.\n<b>2. No reference taken in <code>session_find()</code>.</b> The pointer escapes the mutex without <code>kref_get()</code>, so another thread can close and free it before the caller uses it. Take the reference under the lock; the caller later calls the put.\n<b>3. Not-found returns garbage.</b> If the loop finishes, <code>s</code> is <code>container_of(&amp;sessions, ...)</code>, a bogus pointer into static data, not NULL. Return NULL explicitly.\nFor lockless lookups use RCU with <code>kref_get_unless_zero()</code> (or <code>refcount_inc_not_zero()</code>) and <code>kfree_rcu()</code>. KASAN reports all of these."
+ },
+ {
+  "id": "p30",
+  "track": "C & systems",
+  "kind": "predict",
+  "title": "memmove with overlapping buffers",
+  "difficulty": 2,
+  "code": "#include <stdio.h>\n#include <string.h>\n\nint main(void)\n{\n    char buf[16] = \"abcdefgh\";\n    char tmp[16] = \"abcdefgh\";\n\n    memmove(buf + 2, buf, 5);\n    printf(\"%s\\n\", buf);\n\n    memmove(tmp, tmp + 3, 4);\n    printf(\"%s\\n\", tmp);\n\n    printf(\"%zu\\n\", strlen(buf + 6));\n    return 0;\n}",
+  "question": "What does this print? What if both calls used <code>memcpy</code> instead?",
+  "answer": "Output: <code>ababcdeh</code>, <code>defgefgh</code>, <code>2</code>.\n<code>memmove()</code> behaves as if it copied through a temporary buffer, so overlapping regions are handled. Copying 5 bytes <code>abcde</code> to offset 2 overwrites <code>cdefg</code>, leaving <code>ab</code> + <code>abcde</code> + <code>h</code>. Moving 4 bytes <code>defg</code> to the front overwrites <code>abcd</code>, giving <code>defg</code> + <code>efgh</code>. <code>buf + 6</code> is <code>\"eh\"</code>, length 2. No NUL is moved; the original terminators at index 8 stay.\nWith <code>memcpy</code>, overlapping source and destination is <b>undefined behaviour</b>. The result depends on the libc implementation, copy direction, CPU and even buffer size: a forward byte copy would produce <code>abababah</code> for the first call, while an optimised copy might happen to work, until a glibc upgrade changes it (this really broke software in 2010). Use <code>memmove</code> whenever regions may overlap, for example shifting data in a receive buffer after consuming a header, or inserting into an array."
+ },
+ {
+  "id": "p31",
+  "track": "Embedded",
+  "kind": "bug",
+  "title": "Main loop and ISRs sharing state",
+  "difficulty": 3,
+  "code": "/* 16-bit MCU (e.g. MSP430); USART1_DR reads the received byte */\nstatic uint32_t uptime_ms, last_blink;   /* uptime_ms: timer ISR */\nstatic uint8_t  rx_buf[64];\nstatic uint8_t  rx_len;\nstatic uint8_t  rx_ready;\n\nvoid TIM2_IRQHandler(void) { uptime_ms++; }\n\nvoid USART1_IRQHandler(void)\n{\n    uint8_t b = USART1_DR;\n\n    if (rx_len < sizeof(rx_buf))\n        rx_buf[rx_len++] = b;\n    if (b == '\\n')\n        rx_ready = 1;\n}\n\nint main(void)\n{\n    for (;;) {\n        if (rx_ready) {\n            handle_line(rx_buf, rx_len);\n            rx_len = 0;\n            rx_ready = 0;\n        }\n        if (uptime_ms - last_blink >= 500) {\n            last_blink = uptime_ms;\n            toggle_led();\n        }\n    }\n}",
+  "question": "Identify every way the main loop and the ISRs can corrupt or miss data here.",
+  "answer": "<b>1. No <code>volatile</code>.</b> <code>rx_ready</code>, <code>rx_len</code> and <code>uptime_ms</code> are changed by ISRs, so the optimiser may cache them in registers and the loop never sees new data.\n<b>2. Torn 32-bit reads.</b> On a 16-bit CPU <code>uptime_ms</code> is read in two halves. If the timer ISR carries from 0x0000FFFF to 0x00010000 between them, main sees 0x0001FFFF or 0x00000000. Snapshot it with interrupts disabled, or read twice until two reads match.\n<b>3. Buffer reused while still being filled.</b> Bytes arriving during <code>handle_line()</code> are appended to the line being parsed; bytes arriving between <code>handle_line()</code> and <code>rx_len = 0</code> are silently dropped; and <code>rx_len = 0</code> can race with the ISR's <code>rx_len++</code>.\n<b>Fix:</b> keep ISRs minimal and push bytes into a single-producer/single-consumer ring buffer (or double-buffer whole lines), mark shared variables <code>volatile</code>, and keep short critical sections for multi-byte state. The unsigned subtraction <code>now - last &gt;= 500</code> is already wrap-safe."
+ },
+ {
+  "id": "p32",
+  "track": "Kernel",
+  "kind": "explain",
+  "title": "The lost wake-up",
+  "difficulty": 3,
+  "code": "static DECLARE_WAIT_QUEUE_HEAD(wq);\nstatic bool data_ready;\n\n/* reader, process context */\nstatic ssize_t dev_read(struct file *f, char __user *buf,\n                        size_t len, loff_t *off)\n{\n    if (!data_ready)\n        interruptible_sleep_on(&wq);       /* old-style API */\n    data_ready = false;\n    return copy_out(buf, len);\n}\n\n/* interrupt handler */\nstatic irqreturn_t dev_irq(int irq, void *id)\n{\n    data_ready = true;\n    wake_up_interruptible(&wq);\n    return IRQ_HANDLED;\n}",
+  "question": "Explain how the reader can sleep forever even though data arrived, and how <code>wait_event_interruptible()</code> closes the race.",
+  "answer": "<b>Lost wake-up.</b> The reader checks <code>data_ready</code> (false), and before it gets onto the wait queue, the IRQ fires on another CPU (or preempts it), sets the flag and calls <code>wake_up</code> on an empty queue. The reader then goes to sleep and waits for a wake-up that has already happened. <code>interruptible_sleep_on()</code> was removed in Linux 3.15 because it is inherently racy.\n<code>wait_event_interruptible(wq, data_ready)</code> runs a loop: <code>prepare_to_wait()</code> adds the task to the queue and sets <code>TASK_INTERRUPTIBLE</code> first, then re-checks the condition, then <code>schedule()</code>s. A wake-up arriving after the check sets the task back to running, so <code>schedule()</code> returns immediately. The condition is re-evaluated after every wake, which also handles spurious wake-ups and multiple readers.\nStill required: check the return value (<code>-ERESTARTSYS</code> on a signal), and consume <code>data_ready</code> and the data under a spinlock shared with the IRQ, since two readers can both see true. The waker must set the condition before calling <code>wake_up()</code>."
+ },
+ {
+  "id": "p33",
+  "track": "C & systems",
+  "kind": "write",
+  "title": "Reverse the bits of a uint32_t",
+  "difficulty": 2,
+  "code": "#include <stdint.h>\n\n/*\n * Return x with its bit order reversed: bit 0 <-> bit 31, bit 1 <-> bit 30...\n *   rev32(0x00000001) == 0x80000000\n *   rev32(0x12345678) == 0x1E6A2C48\n *\n * Use case: an SPI/serial peripheral that shifts LSB-first while the\n * device datasheet documents MSB-first frames.\n */\nuint32_t rev32(uint32_t x);",
+  "question": "Write <code>rev32()</code>, first the obvious loop, then an O(log n) divide-and-conquer version.",
+  "answer": "<b>Loop:</b> shift the result left, append the lowest bit of <code>x</code>, shift <code>x</code> right; repeat 32 times. Use an unsigned type so right shifts bring in zeros.\n<b>Divide and conquer:</b> reversing a word equals swapping its two halves and reversing each half. Do it bottom-up in five steps: swap adjacent bits with mask <code>0x55555555</code>, then 2-bit pairs (<code>0x33333333</code>), nibbles (<code>0x0F0F0F0F</code>), bytes (<code>0x00FF00FF</code>), and finally the 16-bit halves. That is 5 steps instead of 32 and branch-free. The last two steps are just a byte swap, so <code>__builtin_bswap32()</code> can replace them.\nMasking before shifting left avoids carrying bits out of the type. Check: <code>rev32(0x12345678)</code> = 0x1E6A2C48, because each nibble is bit-reversed (1 becomes 8, 2 becomes 4, 3 becomes C, ...) and the nibble order is reversed. The kernel provides <code>bitrev32()</code>/<code>bitrev8()</code> (<code>linux/bitrev.h</code>), which ARM64 implements with a single <code>RBIT</code> instruction.",
+  "solution": "/* Simple: 32 iterations */\nuint32_t rev32_loop(uint32_t x)\n{\n    uint32_t r = 0;\n\n    for (int i = 0; i < 32; i++) {\n        r = (r << 1) | (x & 1);\n        x >>= 1;\n    }\n    return r;\n}\n\n/* Divide and conquer: swap adjacent bits, pairs, nibbles, bytes, halves */\nuint32_t rev32(uint32_t x)\n{\n    x = ((x >> 1) & 0x55555555u) | ((x & 0x55555555u) << 1);\n    x = ((x >> 2) & 0x33333333u) | ((x & 0x33333333u) << 2);\n    x = ((x >> 4) & 0x0F0F0F0Fu) | ((x & 0x0F0F0F0Fu) << 4);\n    x = ((x >> 8) & 0x00FF00FFu) | ((x & 0x00FF00FFu) << 8);\n    return (x >> 16) | (x << 16);\n}"
+ },
+ {
+  "id": "p34",
+  "track": "Networking",
+  "kind": "explain",
+  "title": "skb_push, skb_pull and headroom",
+  "difficulty": 3,
+  "code": "/* Transmit: prepend a 4-byte switch tag in front of the frame */\nstatic netdev_tx_t tag_xmit(struct sk_buff *skb, struct net_device *dev)\n{\n    struct tag_hdr *th;\n\n    if (skb_cow_head(skb, TAG_LEN)) {\n        dev_kfree_skb_any(skb);\n        dev->stats.tx_dropped++;\n        return NETDEV_TX_OK;\n    }\n    th = skb_push(skb, TAG_LEN);\n    th->magic = htons(TAG_MAGIC);\n    th->port  = htons(tag_port(dev));\n    return lower_xmit(skb);\n}\n\n/* Receive: strip the tag again */\nstatic void tag_rcv(struct sk_buff *skb)\n{\n    struct tag_hdr *th;\n\n    if (!pskb_may_pull(skb, TAG_LEN)) {\n        kfree_skb(skb);\n        return;\n    }\n    th = (struct tag_hdr *)skb->data;\n    skb_pull(skb, TAG_LEN);\n    deliver(skb, ntohs(th->port));\n}",
+  "question": "Explain what <code>skb_push()</code> and <code>skb_pull()</code> do to the sk_buff pointers, and why <code>skb_cow_head()</code> and <code>pskb_may_pull()</code> are needed.",
+  "answer": "An skb buffer is laid out as <code>head</code> ... <code>data</code> ... <code>tail</code> ... <code>end</code>. <b>Headroom</b> is <code>data - head</code>; <code>len</code> is the packet length.\n<code>skb_push(skb, n)</code> moves <code>data</code> back by n and adds n to <code>len</code>, returning the new <code>data</code>: you prepend a header with <b>no copy</b>, provided headroom exists. If it does not, <code>skb_push</code> hits <code>skb_under_panic()</code>. <code>skb_pull(skb, n)</code> advances <code>data</code> and subtracts n from <code>len</code>. The bytes are still in the buffer, which is why <code>th</code> remains readable after the pull.\n<code>skb_cow_head()</code> guarantees enough headroom and that the header area is not shared with a clone, reallocating if necessary, so writing the tag cannot corrupt another user's view. <code>pskb_may_pull()</code> checks the packet has at least TAG_LEN bytes and that they are in the linear area (not in page fragments) before you dereference <code>skb-&gt;data</code>. Reload header pointers afterwards; it may reallocate. Drivers create headroom with <code>skb_reserve()</code>."
+ },
+ {
+  "id": "p35",
+  "track": "Kernel",
+  "kind": "bug",
+  "title": "A shared interrupt handler",
+  "difficulty": 2,
+  "code": "static irqreturn_t mydev_isr(int irq, void *dev_id)\n{\n    struct mydev *md = dev_id;\n    u32 status;\n\n    status = readl(md->regs + INT_STATUS);\n\n    if (status & INT_RX)\n        mydev_rx(md);\n\n    if (status & INT_ERR) {\n        dev_err(md->dev, \"error irq, status %08x\\n\", status);\n        return IRQ_NONE;\n    }\n\n    writel(status, md->regs + INT_CLEAR);\n    return IRQ_HANDLED;\n}\n\n/* in probe(): */\nret = request_irq(irq, mydev_isr, IRQF_SHARED, \"mydev\", md);",
+  "question": "This handler shares a level-triggered line with another device. What is wrong with its return values and acknowledgement?",
+  "answer": "<b>1. Claims interrupts that are not its own.</b> On a shared line every handler is called for every interrupt. When <code>status == 0</code> the other device raised it, but this handler still returns <code>IRQ_HANDLED</code>. That defeats the kernel's spurious-interrupt detection, so a stuck line will never be reported or disabled. Start with <code>if (!status) return IRQ_NONE;</code> (and treat <code>0xffffffff</code> as \"device gone or powered off\").\n<b>2. Error path returns early without acknowledging.</b> With <code>INT_ERR</code> set it returns <code>IRQ_NONE</code> and never writes <code>INT_CLEAR</code>. A level-triggered line stays asserted, the handler runs again immediately, and after about 100,000 unhandled interrupts the kernel prints irq N: nobody cared and disables the line, taking the other device down with it. Handle the error, clear the status and return <code>IRQ_HANDLED</code>.\n<b>3.</b> Use <code>dev_err_ratelimited()</code> in IRQ paths, because an error storm can flood the console and stall the CPU. For heavy work, return <code>IRQ_WAKE_THREAD</code> and use <code>request_threaded_irq()</code>."
+ },
+ {
+  "id": "p36",
+  "track": "Embedded",
+  "kind": "write",
+  "title": "Lock-free SPSC ring buffer",
+  "difficulty": 3,
+  "code": "#include <stdatomic.h>\n#include <stdbool.h>\n#include <stdint.h>\n\n#define RB_SIZE 256                 /* must be a power of two */\n\nstruct ring {\n    _Atomic uint32_t head;          /* written only by the producer */\n    _Atomic uint32_t tail;          /* written only by the consumer */\n    uint8_t buf[RB_SIZE];\n};\n\n/* Producer: UART RX ISR. Return false (drop the byte) if full. */\nbool rb_push(struct ring *r, uint8_t b);\n\n/* Consumer: main loop / thread. Return false if empty. */\nbool rb_pop(struct ring *r, uint8_t *b);",
+  "question": "Implement <code>rb_push()</code> and <code>rb_pop()</code> without locks or disabling interrupts. Use all <code>RB_SIZE</code> slots.",
+  "answer": "Use <b>free-running</b> 32-bit indices and mask only when indexing the array. Then <code>head == tail</code> means empty and <code>head - tail == RB_SIZE</code> means full, so all slots are usable with no wasted \"gap\" slot. Unsigned subtraction stays correct when the counters wrap, as long as <code>RB_SIZE</code> divides 2^32 (a power of two).\nIt is lock-free because each index has a single writer: only the producer stores <code>head</code> and only the consumer stores <code>tail</code>. Ordering is the subtle part: the producer must write the byte before publishing the new <code>head</code> (release), and the consumer must observe <code>head</code> (acquire) before reading the byte. On a single-core MCU <code>volatile</code> indices alone are not enough, because the compiler may move the non-volatile <code>buf</code> store after the head update. On multicore or weakly ordered CPUs you also need hardware barriers, which release/acquire provide. The kernel equivalents are <code>smp_store_release()</code>/<code>smp_load_acquire()</code> (see <code>Documentation/core-api/circular-buffers.rst</code>) and <code>kfifo</code>.",
+  "solution": "bool rb_push(struct ring *r, uint8_t b)\n{\n    uint32_t head = atomic_load_explicit(&r->head, memory_order_relaxed);\n    uint32_t tail = atomic_load_explicit(&r->tail, memory_order_acquire);\n\n    if (head - tail == RB_SIZE)             /* full */\n        return false;\n    r->buf[head & (RB_SIZE - 1)] = b;\n    /* publish the data before the new head becomes visible */\n    atomic_store_explicit(&r->head, head + 1, memory_order_release);\n    return true;\n}\n\nbool rb_pop(struct ring *r, uint8_t *b)\n{\n    uint32_t tail = atomic_load_explicit(&r->tail, memory_order_relaxed);\n    uint32_t head = atomic_load_explicit(&r->head, memory_order_acquire);\n\n    if (head == tail)                       /* empty */\n        return false;\n    *b = r->buf[tail & (RB_SIZE - 1)];\n    /* finish reading the slot before handing it back */\n    atomic_store_explicit(&r->tail, tail + 1, memory_order_release);\n    return true;\n}"
+ }
+]

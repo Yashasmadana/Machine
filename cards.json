@@ -1,0 +1,1122 @@
+[
+ {
+  "id": "k001",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "Can you sleep while holding a spinlock? Why not, and what does CONFIG_DEBUG_ATOMIC_SLEEP do about it?",
+  "a": "No. On non-RT kernels <code>spin_lock()</code> disables preemption, so scheduling away can leave other CPUs spinning indefinitely, or deadlock if the next task on this CPU wants the same lock. With <b>CONFIG_DEBUG_ATOMIC_SLEEP</b>, <code>might_sleep()</code> checks in sleeping functions print 'BUG: sleeping function called from invalid context' plus a backtrace. On PREEMPT_RT <code>spinlock_t</code> becomes a sleeping lock, but code must still follow the non-RT rules."
+ },
+ {
+  "id": "k002",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "What is the difference between GFP_KERNEL and GFP_ATOMIC, and when must you use GFP_ATOMIC?",
+  "a": "<code>GFP_KERNEL</code> may sleep: it can enter direct reclaim, writeback and compaction, so it is only valid in process context with no spinlocks held. <code>GFP_ATOMIC</code> never sleeps and may dip into emergency reserves. Use it in hardirq or softirq context, under a spinlock, or with preemption/IRQs disabled. It fails more readily, so always handle a NULL return."
+ },
+ {
+  "id": "k003",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "When do you use spin_lock(), spin_lock_bh() and spin_lock_irqsave()?",
+  "a": "<code>spin_lock()</code> is enough when the lock is never taken from interrupt or softirq context. If a softirq or tasklet also takes it, process context uses <code>spin_lock_bh()</code> so a bottom half on the same CPU cannot interrupt the holder and deadlock. If a hardirq handler takes it, use <code>spin_lock_irqsave()</code>, which disables local interrupts and restores the previous IRQ state on unlock."
+ },
+ {
+  "id": "k004",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "When would you choose a mutex over a spinlock or a semaphore?",
+  "a": "Use a mutex for critical sections that may sleep, in process context only. Mutexes enforce strict ownership (only the locker unlocks, no recursion, never from IRQ context) and support optimistic spinning and <b>CONFIG_DEBUG_MUTEXES</b> checks. Semaphores allow counts above one and release by another task, but have no owner. Spinlocks are for short non-sleeping sections or data shared with interrupt handlers."
+ },
+ {
+  "id": "k005",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "What is RCU, and what kind of data structure is it a good fit for?",
+  "a": "Read-Copy-Update lets readers run almost free: <code>rcu_read_lock()</code> only disables preemption or bumps a nesting count. Writers publish a new version with <code>rcu_assign_pointer()</code> and free the old one only after a grace period, via <code>synchronize_rcu()</code> or <code>call_rcu()</code>, once all pre-existing readers have finished. It suits read-mostly data such as routing tables, module lists and network device lists. Writers still serialize among themselves."
+ },
+ {
+  "id": "k006",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "What does lockdep detect, and how can it report a deadlock that never actually happened?",
+  "a": "Lockdep (<b>CONFIG_PROVE_LOCKING</b>) tracks lock classes rather than instances. It records the order in which classes are acquired and in which contexts (hardirq, softirq, IRQs enabled). It reports ABBA ordering inversions, recursive locking, and a lock taken in IRQ context that elsewhere is held with IRQs enabled. Because it validates the dependency graph, it warns the first time a dangerous pattern appears, even if the timing never actually deadlocked."
+ },
+ {
+  "id": "k007",
+  "track": "Kernel",
+  "topic": "Scheduling",
+  "q": "What is preempt_count, and what information do its bit fields carry?",
+  "a": "<code>preempt_count</code> is a counter (per-CPU on x86, in <code>thread_info</code> on arm64) whose fields hold preempt-disable depth, softirq count, hardirq count and NMI state. Non-zero means the task must not be rescheduled. <code>in_hardirq()</code>, <code>in_softirq()</code>, <code>in_interrupt()</code> and <code>in_atomic()</code> read it. Without <b>CONFIG_PREEMPT_COUNT</b>, <code>spin_lock()</code> does not increment it, so drivers must never use <code>in_atomic()</code> to decide whether sleeping is allowed."
+ },
+ {
+  "id": "k008",
+  "track": "Kernel",
+  "topic": "Interrupts",
+  "q": "What should a hardirq handler do, and what is it forbidden to do?",
+  "a": "It runs in atomic context, usually with local interrupts disabled, so it should acknowledge the device, capture urgent state and defer the rest. It must not sleep: no mutexes, no <code>GFP_KERNEL</code> allocation, no <code>copy_to_user()</code>, no <code>msleep()</code>. It returns <code>IRQ_HANDLED</code>, <code>IRQ_NONE</code> or <code>IRQ_WAKE_THREAD</code>. Deferred work goes to a threaded handler, a workqueue, or a softirq."
+ },
+ {
+  "id": "k009",
+  "track": "Kernel",
+  "topic": "Interrupts",
+  "q": "What runs in softirq context, when does it run, and what rules apply to code there?",
+  "a": "Softirqs (HI, TIMER, NET_TX, NET_RX, BLOCK, IRQ_POLL, TASKLET, SCHED, HRTIMER, RCU) run on IRQ exit, in <code>local_bh_enable()</code>, or in per-CPU <code>ksoftirqd</code> threads under load. They are atomic, so no sleeping. The same softirq can run on several CPUs at once, so its data must be per-CPU or locked. A given tasklet, by contrast, never runs on two CPUs simultaneously."
+ },
+ {
+  "id": "k010",
+  "track": "Kernel",
+  "topic": "Interrupts",
+  "q": "How do threaded IRQs work, and why is IRQF_ONESHOT required when the primary handler is NULL?",
+  "a": "<code>request_threaded_irq()</code> splits handling into a hardirq primary handler and a kernel thread (<code>irq/N-name</code>) that may sleep, which suits devices behind I2C or SPI. With a NULL primary handler the line must remain masked until the thread finishes, otherwise a level-triggered interrupt would fire again immediately and storm. <code>IRQF_ONESHOT</code> provides that. IRQ threads run as SCHED_FIFO at priority 50 by default."
+ },
+ {
+  "id": "k011",
+  "track": "Kernel",
+  "topic": "Interrupts",
+  "q": "How do you control which CPU services an interrupt, and when would you change it?",
+  "a": "Write a hex CPU mask to <code>/proc/irq/N/smp_affinity</code> or a CPU list to <code>smp_affinity_list</code>. Common reasons: putting NIC queue interrupts on the CPU running the consumer, or keeping IRQs off isolated real-time cores. The <code>irqbalance</code> daemon may rewrite your settings unless configured to ignore those IRQs. Managed interrupts (multi-queue NVMe, some NICs) have kernel-assigned affinity that userspace cannot change."
+ },
+ {
+  "id": "k012",
+  "track": "Kernel",
+  "topic": "Interrupts",
+  "q": "What must a handler for a shared interrupt line do differently?",
+  "a": "Register with <code>IRQF_SHARED</code> and a unique, non-NULL <code>dev_id</code>, which <code>free_irq()</code> uses to identify which handler to remove. The handler must read its device's status register and return <code>IRQ_NONE</code> if its device did not raise the interrupt, <code>IRQ_HANDLED</code> otherwise. If nobody claims an interrupt repeatedly, the kernel logs 'irq N: nobody cared' and disables the line."
+ },
+ {
+  "id": "k013",
+  "track": "Kernel",
+  "topic": "Modules",
+  "q": "What do module_init, module_exit, __init and __exit do?",
+  "a": "<code>module_init()</code> names the function run at insmod time, or as a device-level initcall when built in; a non-zero return aborts loading. <code>module_exit()</code> runs at rmmod; a module without one cannot be unloaded. <code>__init</code> puts code in <code>.init.text</code>, freed once initialization completes, so calling it later crashes. <code>__exit</code> code is discarded entirely when the driver is built into the kernel."
+ },
+ {
+  "id": "k014",
+  "track": "Kernel",
+  "topic": "Modules",
+  "q": "Why does MODULE_LICENSE matter, and what is the difference between EXPORT_SYMBOL and EXPORT_SYMBOL_GPL?",
+  "a": "A non-GPL-compatible or missing <code>MODULE_LICENSE</code> taints the kernel with the P (proprietary) flag, and such a module cannot resolve <code>EXPORT_SYMBOL_GPL</code> symbols, so it fails to load if it uses any. <code>EXPORT_SYMBOL</code> makes a symbol available to every module, while the <code>_GPL</code> variant restricts it to GPL-compatible ones. Taint also makes upstream developers ignore bug reports."
+ },
+ {
+  "id": "k015",
+  "track": "Kernel",
+  "topic": "Modules",
+  "q": "What is the difference between insmod and modprobe, and what does CONFIG_MODVERSIONS protect against?",
+  "a": "<code>insmod</code> loads exactly one .ko file and fails on unresolved symbols. <code>modprobe</code> reads <code>modules.dep</code> (generated by <code>depmod</code>), loads dependencies first, resolves aliases and applies options from <code>/etc/modprobe.d</code>. <b>CONFIG_MODVERSIONS</b> records a CRC of each exported symbol's prototype; a module built against a kernel whose symbol signatures differ is rejected instead of crashing at runtime."
+ },
+ {
+  "id": "k016",
+  "track": "Kernel",
+  "topic": "Drivers",
+  "q": "Why must a driver use copy_from_user() instead of dereferencing or memcpy-ing a user pointer?",
+  "a": "User pointers are untrusted: they may be unmapped, swapped out, or point into kernel memory. <code>copy_from_user()</code> checks the range is userspace (<code>access_ok()</code>), handles faults through exception tables instead of oopsing, and toggles SMAP/PAN protection. It may sleep while faulting pages in. It returns the number of bytes NOT copied, so drivers return <code>-EFAULT</code> when it is non-zero."
+ },
+ {
+  "id": "k017",
+  "track": "Kernel",
+  "topic": "Drivers",
+  "q": "How should ioctl commands be defined and implemented in a modern driver?",
+  "a": "Encode commands with <code>_IO</code>, <code>_IOR</code>, <code>_IOW</code> or <code>_IOWR(type, nr, datatype)</code>, which pack direction, argument size, a magic type and a number to avoid collisions. Implement <code>.unlocked_ioctl</code> and return <code>-ENOTTY</code> for unknown commands. Provide <code>.compat_ioctl</code> for 32-bit userspace on a 64-bit kernel; <code>compat_ptr_ioctl</code> works when the argument is just a pointer to layout-identical structs."
+ },
+ {
+  "id": "k018",
+  "track": "Kernel",
+  "topic": "Drivers",
+  "q": "How do you implement mmap in a character driver to expose a buffer or registers to userspace?",
+  "a": "The <code>.mmap</code> file operation receives a <code>vm_area_struct</code> describing the user range. For physically contiguous RAM, call <code>remap_pfn_range()</code>; for MMIO use <code>io_remap_pfn_range()</code> with <code>pgprot_noncached()</code> or <code>pgprot_writecombine()</code>. Alternatively supply a <code>.fault</code> handler that inserts pages on demand. For DMA buffers use <code>dma_mmap_coherent()</code>. Always validate <code>vm_pgoff</code> and the requested size against the buffer."
+ },
+ {
+  "id": "k019",
+  "track": "Kernel",
+  "topic": "Synchronization",
+  "q": "How do wait queues work, and why does wait_event_interruptible() take a condition rather than just sleeping?",
+  "a": "A task sleeps on a <code>wait_queue_head_t</code> until a condition is true. <code>wait_event_interruptible(wq, cond)</code> checks <code>cond</code> before sleeping and after every wakeup, closing the race where the event fires between check and sleep. It returns <code>-ERESTARTSYS</code> if a signal arrives. The waker updates the condition first, then calls <code>wake_up_interruptible()</code>. Wakeups can be spurious, hence the re-check."
+ },
+ {
+  "id": "k020",
+  "track": "Kernel",
+  "topic": "Synchronization",
+  "q": "What is a completion, and when is it preferable to a wait queue or semaphore?",
+  "a": "A completion signals that an event occurred: one side calls <code>wait_for_completion()</code>, the other <code>complete()</code> (wakes one waiter) or <code>complete_all()</code>. It fits 'wait until the DMA transfer or firmware load finishes' and avoids misusing semaphores as events. Timeout and interruptible variants exist. Call <code>reinit_completion()</code> before reusing it, and never let the completion's memory disappear while a waiter may still touch it."
+ },
+ {
+  "id": "k021",
+  "track": "Kernel",
+  "topic": "Timers",
+  "q": "What are jiffies and HZ, and how do you compare jiffies values safely?",
+  "a": "<code>jiffies</code> counts timer ticks since boot; <code>HZ</code> (typically 100, 250 or 1000) is ticks per second. On 32-bit kernels it wraps, and it starts at minus five minutes (<code>INITIAL_JIFFIES</code>) so wrap bugs appear early. Compare with <code>time_after()</code> and <code>time_before()</code>, which use signed subtraction and survive wraparound; never use a plain <code>&lt;</code>. <code>jiffies_64</code> gives a non-wrapping value."
+ },
+ {
+  "id": "k022",
+  "track": "Kernel",
+  "topic": "Timers",
+  "q": "When do you use a timer_list versus an hrtimer, and what context do their callbacks run in?",
+  "a": "<code>timer_list</code> is jiffies-resolution, kept on a timer wheel optimized for timeouts that are usually cancelled, with callbacks in softirq context. <code>hrtimer</code> uses <code>ktime_t</code> nanosecond expiry on clockevent hardware, suited to precise or periodic events; callbacks run in hardirq context unless <code>HRTIMER_MODE_SOFT</code> is used. Neither callback may sleep. Recent kernels renamed <code>del_timer_sync()</code> to <code>timer_delete_sync()</code>."
+ },
+ {
+  "id": "k023",
+  "track": "Kernel",
+  "topic": "Timers",
+  "q": "Compare udelay(), usleep_range() and msleep(). Which would you use for a 50 microsecond and a 2 millisecond delay?",
+  "a": "<code>udelay()</code> busy-waits: safe in atomic context, wasteful, keep it short. <code>usleep_range()</code> sleeps on an hrtimer and suits about 10 us to 20 ms, with the range allowing wakeup coalescing. <code>msleep()</code> is jiffies-based and oversleeps for small values: <code>msleep(1)</code> takes about 20 ms at HZ=100. So use <code>usleep_range(50, 100)</code> and <code>usleep_range(2000, 2500)</code>, or <code>fsleep()</code>."
+ },
+ {
+  "id": "k024",
+  "track": "Kernel",
+  "topic": "Workqueues",
+  "q": "Compare workqueues, tasklets and threaded IRQs for deferring work. Which can sleep?",
+  "a": "Workqueue items run in <code>kworker</code> threads, so they can sleep, take mutexes and use <code>GFP_KERNEL</code>. Threaded IRQ handlers also sleep and are tied to one interrupt line. Tasklets run in softirq context, cannot sleep, and are deprecated; kernel 6.9 added BH workqueues (<code>WQ_BH</code>) as their replacement. Use <code>system_wq</code> for small jobs or <code>alloc_workqueue()</code> for ordered, high-priority or reclaim-safe needs."
+ },
+ {
+  "id": "k025",
+  "track": "Kernel",
+  "topic": "Workqueues",
+  "q": "What does WQ_MEM_RECLAIM do, and why is it needed?",
+  "a": "Work that sits in the memory-reclaim path, such as block I/O completion or filesystem writeback, must make progress even when the kernel cannot allocate memory to create new kworker threads. <code>WQ_MEM_RECLAIM</code> gives the workqueue a dedicated rescuer thread so at least one item can always execute, preventing reclaim deadlock. The kernel warns if a reclaim workqueue flushes a non-reclaim one."
+ },
+ {
+  "id": "k026",
+  "track": "Kernel",
+  "topic": "Workqueues",
+  "q": "Your driver uses an IRQ, a delayed work item and a timer. What must remove() do, and what bug happens otherwise?",
+  "a": "First stop new events (disable the device, free or disable the IRQ), then call <code>cancel_delayed_work_sync()</code> and <code>timer_delete_sync()</code> (formerly <code>del_timer_sync()</code>) to wait for running callbacks. Otherwise a callback can run after private data is freed or the module is unloaded: use-after-free or an oops in vanished code. Never call these while holding a lock the callback itself takes, or you deadlock."
+ },
+ {
+  "id": "k027",
+  "track": "Kernel",
+  "topic": "Per-CPU",
+  "q": "Why use per-CPU variables, and what must you do to access them safely?",
+  "a": "<code>DEFINE_PER_CPU</code> gives each CPU its own copy, eliminating lock contention and cache-line bouncing for counters and statistics. Access must not migrate mid-update, so disable preemption via <code>get_cpu_var()</code>/<code>put_cpu_var()</code> or <code>preempt_disable()</code>, or use <code>this_cpu_inc()</code>-style operations, which are preemption- and IRQ-safe. Readers sum the copies with <code>for_each_possible_cpu()</code> and <code>per_cpu()</code>, accepting a slightly stale total."
+ },
+ {
+  "id": "k028",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "What are memory zones in Linux and why do they exist?",
+  "a": "Zones group physical memory by addressing constraints: <code>ZONE_DMA</code> (first 16 MB on x86 for ISA; sized from firmware limits on arm64), <code>ZONE_DMA32</code> (below 4 GB), <code>ZONE_NORMAL</code>, <code>ZONE_HIGHMEM</code> (32-bit only, not permanently mapped) and <code>ZONE_MOVABLE</code> for hotplug and compaction. GFP flags such as <code>GFP_DMA32</code> restrict eligible zones; allocations fall back toward lower zones when higher ones run short."
+ },
+ {
+  "id": "k029",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "When would you use kmalloc(), vmalloc() or alloc_pages()?",
+  "a": "<code>kmalloc()</code> returns physically contiguous memory from slab caches: fast, and usable with the streaming DMA API. <code>vmalloc()</code> maps scattered pages into a contiguous virtual range, fine for large buffers but slower, page-granular and not physically contiguous. <code>alloc_pages()</code> returns power-of-two page blocks from the buddy allocator. <code>kvmalloc()</code> tries kmalloc and falls back to vmalloc; free with <code>kvfree()</code>."
+ },
+ {
+  "id": "k030",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "How does the OOM killer choose a victim, and how can you influence it?",
+  "a": "When reclaim cannot satisfy an allocation, <code>out_of_memory()</code> picks the task with the highest badness score, roughly its RSS plus swap entries and page tables, adjusted by <code>/proc/PID/oom_score_adj</code> from -1000 (never kill) to +1000 (kill first). It sends SIGKILL, and the OOM reaper frees the victim's anonymous memory early. With a cgroup v2 <code>memory.max</code> limit, the OOM is scoped to that cgroup."
+ },
+ {
+  "id": "k031",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "What is the page cache, and how do dirty pages get written back?",
+  "a": "The page cache holds file contents in RAM, indexed per inode in the <code>address_space</code> XArray. Reads are served from it; writes dirty pages that flusher threads write back once <code>dirty_background_ratio</code> is exceeded or pages age past <code>dirty_expire_centisecs</code>, while <code>dirty_ratio</code> throttles writers. Clean pages are cheap to reclaim. <code>O_DIRECT</code> bypasses the cache; <code>fsync()</code> forces a file's dirty data to storage."
+ },
+ {
+  "id": "k032",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "What is the difference between a minor and major page fault, and what happens if kernel code faults on a bad address?",
+  "a": "A minor fault is resolved without I/O: the page is already in memory (page cache, copy-on-write, zero page) and only a PTE is installed. A major fault must read from storage or swap. If kernel code faults on an address with no exception-table fixup, the result is an oops ('unable to handle page fault'), which is why user memory is accessed only through uaccess helpers."
+ },
+ {
+  "id": "k033",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "What is the slab allocator, and why would a driver create its own kmem_cache?",
+  "a": "The slab layer caches fixed-size objects carved from pages; SLUB is the only implementation since 6.8. <code>kmem_cache_create()</code> builds a dedicated cache for a struct allocated frequently, as with <code>task_struct</code> or skbuff heads. Benefits: less fragmentation and waste, fast per-CPU freelists, optional constructors, per-cache statistics in <code>/proc/slabinfo</code> and targeted <code>slub_debug</code>. <code>kmalloc()</code> uses generic size classes such as kmalloc-64."
+ },
+ {
+  "id": "k034",
+  "track": "Kernel",
+  "topic": "Kernel threads",
+  "q": "How do you create and stop a kernel thread correctly?",
+  "a": "<code>kthread_run(fn, data, \"name\")</code> creates and wakes a thread with no user address space. Its loop checks <code>kthread_should_stop()</code> and sleeps when idle, for example on a wait queue. <code>kthread_stop()</code> sets the stop flag, wakes the thread and waits for its function to return, giving its return value. If the thread might exit on its own first, hold a task reference to avoid use-after-free."
+ },
+ {
+  "id": "k035",
+  "track": "Kernel",
+  "topic": "Proc & sysfs",
+  "q": "When should a driver expose information through sysfs, procfs, or debugfs?",
+  "a": "sysfs reflects the device model: one value per attribute, a stable ABI documented in <code>Documentation/ABI</code>. procfs is for process information and legacy knobs; new non-process files there are discouraged. debugfs has no ABI rules and is meant for developer debugging, often unmounted in production. Structured configuration may suit netlink or configfs better."
+ },
+ {
+  "id": "k036",
+  "track": "Kernel",
+  "topic": "Proc & sysfs",
+  "q": "How do you add sysfs attributes to a device correctly, without racing with udev?",
+  "a": "Write show/store callbacks and declare them with <code>DEVICE_ATTR_RW(name)</code>, collect them in an attribute group and set the driver's <code>.dev_groups</code>, so the core creates the files before the uevent is sent. Calling <code>device_create_file()</code> from probe races with udev rules reading the files. In show(), format with <code>sysfs_emit()</code>, which bounds output to PAGE_SIZE."
+ },
+ {
+  "id": "k037",
+  "track": "Kernel",
+  "topic": "Kobjects",
+  "q": "What does a kobject provide, and why must the containing structure only be freed in its release() function?",
+  "a": "A kobject gives reference counting (<code>kref</code>), a name, a parent link and a sysfs directory; it is embedded in larger objects like <code>struct device</code>. Its <code>kobj_type</code> supplies <code>release()</code>, called when the last reference drops via <code>kobject_put()</code>. Other code, such as an open sysfs file, may still hold references, so freeing the container directly causes use-after-free. A kset groups kobjects and emits uevents."
+ },
+ {
+  "id": "k038",
+  "track": "Kernel",
+  "topic": "Scheduling",
+  "q": "What is priority inversion, and how does Linux address it?",
+  "a": "A low-priority task holds a lock, a high-priority task blocks on it, and medium-priority tasks preempt the holder, so the high-priority task waits unboundedly. Linux <code>rt_mutex</code> implements priority inheritance: the holder temporarily runs at the top waiter's priority. Userspace gets it through PI futexes (<code>PTHREAD_PRIO_INHERIT</code>), and PREEMPT_RT bases <code>spinlock_t</code> and <code>mutex</code> on rt_mutex."
+ },
+ {
+  "id": "k039",
+  "track": "Kernel",
+  "topic": "Scheduling",
+  "q": "What scheduling classes does Linux have, and what changed in the fair scheduler in 6.6?",
+  "a": "In priority order: stop, deadline (<code>SCHED_DEADLINE</code>), real-time (<code>SCHED_FIFO</code>, <code>SCHED_RR</code>), fair (<code>SCHED_NORMAL</code>, <code>SCHED_BATCH</code>, <code>SCHED_IDLE</code>), and idle; 6.12 added sched_ext for BPF-defined schedulers. In 6.6 the fair class switched from CFS's lowest-vruntime pick to EEVDF, which uses lag and virtual deadlines to improve latency. Nice values still set weights, about 10% CPU per nice step."
+ },
+ {
+  "id": "k040",
+  "track": "Kernel",
+  "topic": "Scheduling",
+  "q": "What happens if a SCHED_FIFO task spins in an infinite loop on a CPU?",
+  "a": "SCHED_FIFO runs until the task blocks or yields, so it starves every lower-priority task on that CPU, including kworkers, which can stall RCU and per-CPU work. RT throttling (<code>sched_rt_runtime_us</code> 950000 per <code>sched_rt_period_us</code> 1000000) reserves 5% for non-RT tasks by default so the system stays recoverable; since 6.12 a fair-class deadline server provides this guarantee."
+ },
+ {
+  "id": "k041",
+  "track": "Kernel",
+  "topic": "Scheduling",
+  "q": "Explain PREEMPT_NONE, PREEMPT_VOLUNTARY, PREEMPT and PREEMPT_RT.",
+  "a": "NONE: kernel code is preempted only where it explicitly schedules; best throughput, worst latency. VOLUNTARY adds rescheduling checks at <code>might_sleep()</code> points. PREEMPT allows preemption wherever <code>preempt_count</code> is zero. PREEMPT_RT, mainline since 6.12, turns most spinlocks into sleeping locks and forces threaded IRQs for bounded latency. PREEMPT_LAZY (6.13) defers preemption of fair tasks until the next tick or return to userspace."
+ },
+ {
+  "id": "k042",
+  "track": "Kernel",
+  "topic": "Concurrency",
+  "q": "What do READ_ONCE()/WRITE_ONCE() guarantee, and how do they differ from smp_mb() or smp_load_acquire()?",
+  "a": "<code>READ_ONCE()</code>/<code>WRITE_ONCE()</code> stop the compiler from tearing, fusing, caching or re-reading an access, but impose no CPU ordering. <code>smp_mb()</code>, <code>smp_rmb()</code> and <code>smp_wmb()</code> order accesses between CPUs; <code>smp_store_release()</code>/<code>smp_load_acquire()</code> give one-way ordering for message passing. Barriers only work in pairs across CPUs. Non-smp <code>mb()</code>/<code>wmb()</code> also order against device MMIO and DMA."
+ },
+ {
+  "id": "k043",
+  "track": "Kernel",
+  "topic": "Locking",
+  "q": "What is a seqlock and when is it appropriate?",
+  "a": "Readers take no lock: they read the sequence count, read the data, then retry if the count changed or was odd (a writer was active). Writers take a spinlock and bump the count before and after updating. It suits small, frequently read, rarely written data like timekeeping. Readers must tolerate retries and must not dereference pointers that a writer could free."
+ },
+ {
+  "id": "k044",
+  "track": "Kernel",
+  "topic": "Concurrency",
+  "q": "Why use refcount_t instead of atomic_t for reference counts?",
+  "a": "<code>refcount_t</code> saturates instead of wrapping on overflow and warns on increment-from-zero and underflow, turning a would-be use-after-free exploit into a memory leak. <code>refcount_dec_and_test()</code> also gives release ordering, plus acquire ordering when it hits zero, so the final freer sees every prior write to the object. Plain <code>atomic_t</code> remains right for statistics and non-lifetime counters."
+ },
+ {
+  "id": "k045",
+  "track": "Kernel",
+  "topic": "Drivers",
+  "q": "What are devm_ managed resources, and what pitfalls do they have?",
+  "a": "<code>devm_kzalloc()</code>, <code>devm_ioremap_resource()</code>, <code>devm_request_irq()</code> and friends attach resources to a device and release them automatically, in reverse order, when probe fails or the driver unbinds, removing goto-based error paths. Pitfall: a devm IRQ is freed after <code>remove()</code> returns, so the handler can fire after remove() tore down state it uses. Returning <code>-EPROBE_DEFER</code> makes the core retry probe later."
+ },
+ {
+  "id": "k046",
+  "track": "Kernel",
+  "topic": "Drivers",
+  "q": "What steps register a character device, and when is misc_register() simpler?",
+  "a": "<code>alloc_chrdev_region()</code> reserves a dynamic major and minor range, <code>cdev_init()</code> and <code>cdev_add()</code> bind file_operations, and <code>class_create()</code> plus <code>device_create()</code> let udev create the /dev node. The device is live as soon as <code>cdev_add()</code> returns, so initialize everything first. For a single node, <code>misc_register()</code> with <code>MISC_DYNAMIC_MINOR</code> under major 10 does all of this."
+ },
+ {
+  "id": "k047",
+  "track": "Kernel",
+  "topic": "Debugging",
+  "q": "What is the difference between an oops and a panic, and how do you find the faulting source line?",
+  "a": "An oops is a kernel exception (bad pointer, <code>BUG()</code>) that kills the current task, taints the kernel and may let it continue. A panic halts the system; an oops escalates to panic in interrupt context or with <code>panic_on_oops=1</code>. Decode the reported pc/RIP and call trace with <code>scripts/decode_stacktrace.sh</code>, <code>scripts/faddr2line</code>, or <code>addr2line</code> on a vmlinux built with debug info."
+ },
+ {
+  "id": "k048",
+  "track": "Kernel",
+  "topic": "Syscalls",
+  "q": "What happens, step by step, when a userspace program makes a system call?",
+  "a": "The program loads the syscall number and arguments into registers and executes a trap: <code>syscall</code> on x86-64, <code>svc #0</code> on arm64 and ARM EABI. The CPU enters kernel mode at the entry vector, which saves user registers into <code>pt_regs</code> and dispatches through the syscall table. Before returning it handles pending work such as signals and rescheduling. The vDSO serves calls like <code>clock_gettime()</code> without trapping."
+ },
+ {
+  "id": "k049",
+  "track": "Kernel",
+  "topic": "Memory",
+  "q": "How does fork() avoid copying the parent's entire address space?",
+  "a": "It duplicates the VMAs and page tables but marks private writable pages read-only in both processes, sharing the physical pages. The first write by either side page-faults, and the kernel copies only that page (copy-on-write) and maps it writable. Shared mappings stay shared. Page tables are still copied, so large processes pay a cost; <code>vfork()</code> and <code>posix_spawn()</code> avoid it."
+ },
+ {
+  "id": "k050",
+  "track": "Kernel",
+  "topic": "Context",
+  "q": "What does 'current' mean in process context versus interrupt context?",
+  "a": "In process context (system calls, kernel threads, workqueue items) <code>current</code> is the task the kernel is working for, and the code may sleep. In interrupt context <code>current</code> is merely whichever task happened to be interrupted, unrelated to the interrupt, so using its credentials or user memory is meaningless, and sleeping is forbidden. <code>in_task()</code> tells you which context you are in."
+ },
+ {
+  "id": "n001",
+  "track": "Networking",
+  "topic": "Models",
+  "q": "How do the OSI and TCP/IP models map onto each other, and where do Ethernet, IP and TCP sit?",
+  "a": "OSI has seven layers: physical, data link, network, transport, session, presentation, application. TCP/IP uses four: link, internet, transport, application, folding session and presentation into the application. Ethernet is layer 2, IP layer 3, TCP and UDP layer 4. In Linux, NIC drivers and the L2 core cover link, net/ipv4 and net/ipv6 the internet layer, and sockets expose transport to applications."
+ },
+ {
+  "id": "n002",
+  "track": "Networking",
+  "topic": "IP & routing",
+  "q": "How does ARP work, and what is a gratuitous ARP used for?",
+  "a": "ARP (ethertype 0x0806) maps an IPv4 address to a MAC on the local link: the host broadcasts 'who-has 10.0.0.1', the owner replies by unicast, and the result is cached in the neighbour table (<code>ip neigh</code>). A gratuitous ARP announces a host's own mapping unsolicited, updating peers' caches after failover or VIP moves and helping detect duplicate addresses. IPv6 uses Neighbor Discovery over ICMPv6 instead."
+ },
+ {
+  "id": "n003",
+  "track": "Networking",
+  "topic": "IP & routing",
+  "q": "Which ICMP messages do traceroute and Path MTU Discovery rely on?",
+  "a": "Traceroute sends probes with increasing TTL; each router that decrements TTL to zero returns Time Exceeded (type 11), and the destination answers UDP probes with Port Unreachable (type 3, code 3). IPv4 PMTUD sets DF and relies on Destination Unreachable 'fragmentation needed' (type 3, code 4), which carries the next-hop MTU. ICMPv6 uses Packet Too Big (type 2)."
+ },
+ {
+  "id": "n004",
+  "track": "Networking",
+  "topic": "Protocols",
+  "q": "Walk through how a DHCP client obtains an address.",
+  "a": "DORA: the client broadcasts DISCOVER from 0.0.0.0:68 to 255.255.255.255:67; servers answer with OFFER; the client broadcasts REQUEST naming the chosen server and address; that server confirms with ACK (or NAK). The client renews by unicast at T1 (50% of the lease) and rebinds by broadcast at T2 (87.5%). Relay agents fill in giaddr to forward requests across subnets."
+ },
+ {
+  "id": "n005",
+  "track": "Networking",
+  "topic": "Protocols",
+  "q": "How does DNS resolution work, and when does DNS use TCP instead of UDP?",
+  "a": "The stub resolver (glibc via <code>/etc/resolv.conf</code>, or systemd-resolved) sends a recursive query to a resolver, which walks root, TLD and authoritative servers and caches answers for their TTL. DNS normally uses UDP port 53, but falls back to TCP when a response is truncated (TC bit) and for zone transfers. EDNS0 allows UDP payloads beyond 512 bytes. Common records: A, AAAA, CNAME, MX, NS, PTR, TXT."
+ },
+ {
+  "id": "n006",
+  "track": "Networking",
+  "topic": "Subnetting",
+  "q": "How many usable hosts are in a /27, and what are the network and broadcast addresses for 192.168.10.70/27?",
+  "a": "A /27 leaves 5 host bits: 32 addresses, 30 usable. Mask 255.255.255.224, so the last octet moves in blocks of 32: 0, 32, 64, 96. Address .70 falls in 192.168.10.64/27, with broadcast 192.168.10.95 and usable hosts .65 through .94. The exception is /31, which RFC 3021 allows on point-to-point links with both addresses usable."
+ },
+ {
+  "id": "n007",
+  "track": "Networking",
+  "topic": "Subnetting",
+  "q": "Is 10.1.7.200 inside 10.1.4.0/22? Show the quick mental math.",
+  "a": "Yes. A /22 mask is 255.255.252.0, so the third octet moves in blocks of 4 (256 minus 252). The block starting at 4 covers 4 through 7, giving 10.1.4.0 to 10.1.7.255: 1024 addresses, 1022 usable. So 10.1.7.200 is inside, whereas 10.1.8.1 belongs to the next block, 10.1.8.0/22."
+ },
+ {
+  "id": "n008",
+  "track": "Networking",
+  "topic": "MTU",
+  "q": "What is the difference between MTU and MSS, and why do tunnels cause MSS clamping?",
+  "a": "MTU is the largest IP packet a link carries, 1500 bytes on standard Ethernet. MSS is the largest TCP payload, announced in the SYN: MTU minus IP and TCP headers, so 1460 for IPv4 and 1440 for IPv6 without options. Tunnels such as PPPoE, GRE or VXLAN reduce the effective MTU, so routers clamp the MSS in SYNs (<code>TCPMSS --clamp-mss-to-pmtu</code>) to avoid fragmentation."
+ },
+ {
+  "id": "n009",
+  "track": "Networking",
+  "topic": "MTU",
+  "q": "How does fragmentation differ between IPv4 and IPv6?",
+  "a": "In IPv4, routers may fragment when DF is clear; fragments share the Identification field, carry offsets in 8-byte units and use the MF flag, and only the destination reassembles. IPv6 routers never fragment: only the source can, using a Fragment extension header, after learning the path MTU (minimum 1280). In both, losing one fragment loses the whole datagram, so fragmentation is avoided."
+ },
+ {
+  "id": "n010",
+  "track": "Networking",
+  "topic": "MTU",
+  "q": "What is a PMTUD black hole and how do you fix it?",
+  "a": "When a firewall drops ICMP 'fragmentation needed' or 'packet too big' messages, the sender never learns the smaller path MTU. The handshake works with small packets, but full-size segments silently vanish, so connections hang once real data flows. Fixes: allow those ICMP types, clamp MSS on the tunnel router, or enable packetization-layer probing with <code>net.ipv4.tcp_mtu_probing</code>."
+ },
+ {
+  "id": "n011",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "Compare TCP and UDP. When would you deliberately choose UDP?",
+  "a": "TCP is connection-oriented: handshake, reliable in-order byte stream, flow control and congestion control, at the cost of head-of-line blocking and setup latency. UDP sends independent datagrams with only port demultiplexing and a checksum (optional in IPv4, mandatory in IPv6), and preserves message boundaries. Choose UDP for DNS, real-time audio and video, multicast, or protocols like QUIC that implement their own reliability."
+ },
+ {
+  "id": "n012",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "Describe the TCP three-way handshake. What is a SYN flood and how do SYN cookies defend against it?",
+  "a": "Client sends SYN with sequence x; server replies SYN-ACK with sequence y and ack x+1; client sends ACK y+1. A SYN flood sends many SYNs without completing them, filling the SYN queue. With <code>net.ipv4.tcp_syncookies</code>, when the queue overflows the server encodes MSS, a timestamp and a keyed hash into its initial sequence number and keeps no state until a valid ACK returns."
+ },
+ {
+  "id": "n013",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "What does TIME_WAIT protect against, and why does the active closer hold it for 2*MSL?",
+  "a": "The side that closes first enters TIME_WAIT so it can retransmit the final ACK if the peer's FIN is retransmitted, and so delayed segments from the old connection expire before the same 4-tuple is reused. 2*MSL covers one maximum segment lifetime each way; Linux hard-codes 60 seconds. Clients opening many short connections can exhaust ephemeral ports; <code>net.ipv4.tcp_tw_reuse</code> helps for outgoing connections."
+ },
+ {
+  "id": "n014",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "A server has thousands of sockets in CLOSE_WAIT. What does that mean and where is the bug?",
+  "a": "CLOSE_WAIT means the peer sent FIN and the kernel ACKed it, but the local application has not called <code>close()</code>. Unlike TIME_WAIT it has no timeout, so a growing count is an application bug: leaked descriptors, or code that ignores <code>read()</code> returning 0. Find the owning process with <code>ss -tanp state close-wait</code> and fix its close path."
+ },
+ {
+  "id": "n015",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "How do Nagle's algorithm and delayed ACK interact badly, and how do you fix it?",
+  "a": "Nagle holds back small segments while earlier data is unacknowledged. Delayed ACK lets the receiver wait (40 to 200 ms on Linux) hoping to piggyback the ACK. With a write-write-read pattern, the sender's second small write waits for an ACK that the receiver is delaying: a 40 ms stall per request. Fix with <code>TCP_NODELAY</code>, a single <code>writev()</code>, or <code>TCP_CORK</code> to batch explicitly."
+ },
+ {
+  "id": "n016",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "Explain slow start, congestion avoidance and fast retransmit. What does Linux use by default?",
+  "a": "The sender limits in-flight data with cwnd (initially 10 segments). Slow start roughly doubles cwnd per RTT until ssthresh; congestion avoidance then adds about one segment per RTT. Three duplicate ACKs trigger fast retransmit and recovery, reducing cwnd moderately; an RTO collapses cwnd to one segment. Linux defaults to CUBIC; BBR instead models bottleneck bandwidth and RTT. See <code>net.ipv4.tcp_congestion_control</code>."
+ },
+ {
+  "id": "n017",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "What is the difference between TCP flow control and congestion control, and why is window scaling needed?",
+  "a": "Flow control protects the receiver, which advertises its free buffer as rwnd. Congestion control protects the network through the sender's cwnd. The sender may have at most min(rwnd, cwnd) unacknowledged. The header's window is 16 bits, capping at 64 KB, far too small for high bandwidth-delay paths, so the window scale option (shift up to 14, negotiated in SYNs) allows windows of about 1 GB."
+ },
+ {
+  "id": "n018",
+  "track": "Networking",
+  "topic": "Sockets",
+  "q": "What is the difference between SO_REUSEADDR and SO_REUSEPORT on Linux?",
+  "a": "<code>SO_REUSEADDR</code> lets a server bind its port while old connections linger in TIME_WAIT, so restarts do not fail with EADDRINUSE; on Linux it does not allow two active TCP listeners on the same address and port. <code>SO_REUSEPORT</code> (3.9+) lets multiple sockets with the same effective UID bind the identical address and port, and the kernel hashes incoming connections or datagrams across them. A BPF program can override the selection."
+ },
+ {
+  "id": "n019",
+  "track": "Networking",
+  "topic": "Sockets",
+  "q": "What does the backlog argument to listen() control on Linux, and what happens when it overflows?",
+  "a": "It sizes the accept queue of fully established connections awaiting <code>accept()</code>, capped by <code>net.core.somaxconn</code> (4096 since 5.4). Half-open SYN_RECV entries are limited separately by <code>tcp_max_syn_backlog</code> and SYN cookies. When the accept queue is full, Linux drops the client's final ACK (or sends RST if <code>tcp_abort_on_overflow=1</code>), and the client retransmits. Watch ListenOverflows in <code>nstat</code>."
+ },
+ {
+  "id": "n020",
+  "track": "Networking",
+  "topic": "Sockets",
+  "q": "What is the difference between level-triggered and edge-triggered epoll, and what bug does edge-triggered invite?",
+  "a": "Level-triggered epoll reports a descriptor every time you wait while it remains ready. Edge-triggered (<code>EPOLLET</code>) reports only when readiness changes, so you must read or accept on a non-blocking descriptor until EAGAIN; stopping early leaves data unread with no further notification, and the connection stalls. <code>EPOLLONESHOT</code> disarms after one event for thread pools; <code>EPOLLEXCLUSIVE</code> reduces thundering herds."
+ },
+ {
+  "id": "n021",
+  "track": "Networking",
+  "topic": "Sockets",
+  "q": "What are raw sockets in Linux, and how do AF_PACKET and AF_INET SOCK_RAW differ?",
+  "a": "<code>AF_PACKET</code> sockets work at layer 2: <code>SOCK_RAW</code> sees whole Ethernet frames including headers, <code>SOCK_DGRAM</code> strips the link header. tcpdump uses them with an attached classic BPF filter and <code>PACKET_MMAP</code> rings. <code>AF_INET</code> with <code>SOCK_RAW</code> works at layer 3 for one protocol, such as <code>IPPROTO_ICMP</code> for ping, and <code>IP_HDRINCL</code> lets you build the IP header. Both require <code>CAP_NET_RAW</code>."
+ },
+ {
+  "id": "n022",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What is netlink and why did it replace ioctl for network configuration?",
+  "a": "Netlink (<code>AF_NETLINK</code>) is a socket-based message protocol between kernel and userspace. iproute2 uses <code>NETLINK_ROUTE</code> (rtnetlink) to manage links, addresses, routes and neighbours. Messages carry type-length-value attributes, so new fields extend the ABI without breaking it, and multicast groups push change notifications. Generic netlink multiplexes families such as nl80211 and, since 5.6, ethtool."
+ },
+ {
+  "id": "n023",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "Explain the sk_buff pointers head, data, tail and end. What are headroom and tailroom?",
+  "a": "<code>head</code> and <code>end</code> bound the allocated linear buffer; <code>data</code> and <code>tail</code> bound the packet bytes currently in it. Headroom (data minus head) lets lower layers prepend headers without copying; tailroom (end minus tail) allows appending. <code>skb-&gt;len</code> counts all data including paged fragments, <code>skb-&gt;data_len</code> only the non-linear part. <code>skb_shared_info</code> sits at <code>end</code>, holding <code>frags[]</code> and <code>frag_list</code>."
+ },
+ {
+  "id": "n024",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What do skb_reserve(), skb_put(), skb_push() and skb_pull() do?",
+  "a": "<code>skb_reserve()</code> advances data and tail on an empty skb to create headroom. <code>skb_put()</code> moves tail forward to append data and returns the old tail. <code>skb_push()</code> moves data backward to prepend a header, so each layer pushes its header on transmit; insufficient headroom triggers <code>skb_under_panic</code>. <code>skb_pull()</code> advances data to strip a header on receive, as <code>eth_type_trans()</code> does for Ethernet."
+ },
+ {
+  "id": "n025",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What is the difference between skb_clone() and skb_copy(), and when must you unshare a buffer?",
+  "a": "<code>skb_clone()</code> creates a new sk_buff header that shares the same data buffer, tracked by a dataref count: cheap for packet taps or TCP retransmit queues, but neither clone may modify the data. <code>pskb_copy()</code> copies the header and linear area while sharing page fragments; <code>skb_copy()</code> copies everything. Before writing headers in a possibly shared skb, call <code>skb_cow_head()</code> or <code>skb_ensure_writable()</code>."
+ },
+ {
+  "id": "n026",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "How does NAPI work, and what does the budget mean?",
+  "a": "On an RX interrupt the driver masks its queue's IRQ and calls <code>napi_schedule()</code>. The NET_RX softirq then invokes the driver's poll(), which may process up to budget packets (normally 64). If it handles fewer, it calls <code>napi_complete_done()</code> and unmasks the IRQ; otherwise polling continues. <code>net.core.netdev_budget</code> (300) and <code>netdev_budget_usecs</code> cap each softirq run, after which work moves to ksoftirqd."
+ },
+ {
+  "id": "n027",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What is the difference between GRO and LRO?",
+  "a": "Both merge consecutive TCP segments on receive so the stack processes fewer, larger packets. LRO, usually in NIC hardware, merges loosely and discards header details, so the result cannot be resegmented exactly; it must be disabled when forwarding or bridging. GRO runs in software in the NAPI path with strict merge rules, so GSO can reconstruct identical segments on forward. Hardware GRO (<code>rx-gro-hw</code>) follows GRO rules."
+ },
+ {
+  "id": "n028",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What are TSO and GSO, and why do they improve throughput?",
+  "a": "TSO lets the stack pass the NIC one large TCP segment (up to 64 KB, more with BIG TCP) plus a header template; hardware cuts it into MSS-sized frames and fills in headers and checksums. GSO is the software equivalent, delaying segmentation until just before the driver. Either way the stack traverses once per large packet instead of per MTU frame. Check offloads with <code>ethtool -k</code>."
+ },
+ {
+  "id": "n029",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "Explain RSS, RPS and RFS. How do they differ?",
+  "a": "RSS is in NIC hardware: it hashes each flow (typically Toeplitz over the 4-tuple) to one of several RX queues, each with its own interrupt and CPU. RPS does the same in software for single-queue NICs via <code>rps_cpus</code> masks. RFS steers a flow to the CPU where the consuming application last ran, using <code>rps_sock_flow_entries</code>, improving cache locality. Accelerated RFS programs the NIC to do this."
+ },
+ {
+  "id": "n030",
+  "track": "Networking",
+  "topic": "Traffic control",
+  "q": "What is a qdisc, what is the default, and what can tc do with it?",
+  "a": "A queueing discipline sits on egress between the stack and the driver and decides which packet goes next. The kernel default is pfifo_fast, but most distributions set fq_codel via <code>net.core.default_qdisc</code>; multi-queue NICs get mq with a child per TX queue. <code>tc</code> configures classful qdiscs like HTB for shaping, filters and actions. Ingress can only police or redirect, often to an ifb device."
+ },
+ {
+  "id": "n031",
+  "track": "Networking",
+  "topic": "Netfilter",
+  "q": "Name the netfilter hooks and the iptables tables. Which path does a forwarded packet take?",
+  "a": "IPv4 hooks: PREROUTING, INPUT, FORWARD, OUTPUT, POSTROUTING. Tables: raw (before conntrack, e.g. NOTRACK), mangle (alter fields or marks), nat (DNAT in PREROUTING and OUTPUT, SNAT in POSTROUTING) and filter (INPUT, FORWARD, OUTPUT). Local delivery is PREROUTING then INPUT; forwarding is PREROUTING, FORWARD, POSTROUTING. nftables uses the same hooks with user-defined tables and chains."
+ },
+ {
+  "id": "n032",
+  "track": "Networking",
+  "topic": "Netfilter",
+  "q": "What does connection tracking do, and what happens when the conntrack table fills up?",
+  "a": "<code>nf_conntrack</code> tracks flows by tuple and classifies packets as NEW, ESTABLISHED, RELATED (ICMP errors, or FTP data via helpers) or INVALID, enabling stateful rules like <code>ct state established,related accept</code>. NAT depends on it: only a flow's first packet traverses the nat table, the rest reuse the stored mapping. At <code>nf_conntrack_max</code>, new flows are dropped with 'table full, dropping packet'. Inspect with <code>conntrack -L</code>."
+ },
+ {
+  "id": "n033",
+  "track": "Networking",
+  "topic": "Netfilter",
+  "q": "What is the difference between SNAT, MASQUERADE and DNAT?",
+  "a": "SNAT rewrites the source address in POSTROUTING to a fixed IP. MASQUERADE does the same using the outgoing interface's current address and drops mappings when the interface goes down, suiting DHCP or PPP uplinks. DNAT rewrites the destination in PREROUTING (OUTPUT for local traffic) for port forwarding and load balancing. Replies are translated back automatically through conntrack, and ports are remapped to avoid collisions."
+ },
+ {
+  "id": "n034",
+  "track": "Networking",
+  "topic": "L2",
+  "q": "Describe the 802.1Q VLAN tag and how Linux creates a VLAN interface.",
+  "a": "The 4-byte tag sits after the source MAC: TPID 0x8100, then a 3-bit PCP priority, a 1-bit DEI and a 12-bit VLAN ID; IDs 0 and 4095 are reserved, leaving 4094. It raises the maximum Ethernet frame to 1522 bytes. Create one with <code>ip link add link eth0 name eth0.10 type vlan id 10</code>. NICs can offload tag insertion and stripping; QinQ uses an outer 0x88A8 tag."
+ },
+ {
+  "id": "n035",
+  "track": "Networking",
+  "topic": "L2",
+  "q": "How does a Linux bridge forward frames, and what surprise does br_netfilter cause?",
+  "a": "A bridge is a software L2 switch: it learns source MACs per port into a forwarding database, sends known unicast out one port and floods broadcast, multicast and unknown unicast. It supports STP and per-port VLAN filtering and connects VMs and containers. Loading <code>br_netfilter</code> with <code>bridge-nf-call-iptables=1</code> makes bridged frames traverse iptables, so firewall rules unexpectedly affect L2 traffic."
+ },
+ {
+  "id": "n036",
+  "track": "Networking",
+  "topic": "L2",
+  "q": "Compare bonding modes active-backup, 802.3ad and balance-rr.",
+  "a": "Active-backup (mode 1) uses one link and fails over, needing no switch support. 802.3ad (mode 4) runs LACP, requires switch configuration, and spreads flows using <code>xmit_hash_policy</code> (layer2, layer3+4), so a single flow never exceeds one link's speed. Balance-rr (mode 0) round-robins packets, which can reorder TCP segments. Link failures are detected by <code>miimon</code> or ARP monitoring."
+ },
+ {
+  "id": "n037",
+  "track": "Networking",
+  "topic": "Namespaces",
+  "q": "What does a network namespace isolate, and how does a veth pair connect a container to the host?",
+  "a": "A network namespace has its own interfaces, addresses, routing tables, neighbour cache, netfilter rules, sockets and <code>/proc/sys/net</code> settings. A veth pair is two linked virtual Ethernet devices: a frame transmitted on one is received on the other. Container runtimes move one end into the namespace (<code>ip link set veth1 netns ns1</code>) and attach the other end to a host bridge or route to it."
+ },
+ {
+  "id": "n038",
+  "track": "Networking",
+  "topic": "Tools",
+  "q": "What can you inspect and change with ethtool?",
+  "a": "Link speed, duplex and autonegotiation (<code>ethtool eth0</code>), driver and firmware (<code>-i</code>), NIC statistics (<code>-S</code>), offloads (<code>-k</code>/<code>-K</code>), ring sizes (<code>-g</code>/<code>-G</code>), queue counts (<code>-l</code>/<code>-L</code>), interrupt coalescing (<code>-c</code>/<code>-C</code>), RSS indirection (<code>-x</code>/<code>-X</code>), flow steering rules (<code>-N</code>) and pause frames (<code>-a</code>/<code>-A</code>). Drivers implement <code>struct ethtool_ops</code>; since 5.6 the tool talks to the kernel over generic netlink."
+ },
+ {
+  "id": "n039",
+  "track": "Networking",
+  "topic": "IP & routing",
+  "q": "How does Linux choose a route for a packet, and what does policy routing add?",
+  "a": "Within a routing table the most specific matching prefix wins, then the lowest metric. Policy routing (<code>ip rule</code>) decides which table to consult based on source address, fwmark, incoming interface and so on; the local, main and default tables exist by default. <code>ip route get 8.8.8.8</code> shows the actual decision. Strict <code>rp_filter</code> can drop replies arriving on an unexpected interface with asymmetric routing."
+ },
+ {
+  "id": "n040",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "Trace a received TCP packet from the NIC to the application's recv() call.",
+  "a": "The NIC DMAs the frame into an RX ring and interrupts; the driver schedules NAPI. In the NET_RX softirq, poll() may run XDP, builds an skb and calls <code>napi_gro_receive()</code>. The core delivers to packet taps and tc ingress, then <code>ip_rcv()</code>: netfilter PREROUTING, routing, LOCAL_IN. <code>tcp_v4_rcv()</code> looks up the socket, queues data, and wakes the task blocked in recv()."
+ },
+ {
+  "id": "n041",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What should a NIC driver do when its TX ring is nearly full?",
+  "a": "Call <code>netif_stop_queue()</code> (or <code>netif_tx_stop_queue()</code> per queue) when free descriptors drop below the worst case for one packet, and wake the queue from TX completion once space returns. Returning <code>NETDEV_TX_BUSY</code> from <code>ndo_start_xmit</code> is a bug-prone last resort. While stopped, packets wait in the qdisc. BQL (<code>netdev_tx_sent_queue()</code>/<code>netdev_tx_completed_queue()</code>) limits bytes in the ring to keep latency down."
+ },
+ {
+  "id": "n042",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "What is XDP, and how do native and generic XDP differ?",
+  "a": "XDP runs an eBPF program in the driver's receive path before an sk_buff is allocated; it returns <code>XDP_DROP</code>, <code>XDP_PASS</code>, <code>XDP_TX</code>, <code>XDP_REDIRECT</code> or <code>XDP_ABORTED</code>. That enables line-rate DDoS filtering and load balancing. Native mode needs driver support; generic mode works on any device but runs after skb allocation, losing most of the benefit. AF_XDP sockets deliver frames to userspace, zero-copy where supported."
+ },
+ {
+  "id": "n043",
+  "track": "Networking",
+  "topic": "Linux net stack",
+  "q": "Explain CHECKSUM_PARTIAL, CHECKSUM_UNNECESSARY and CHECKSUM_COMPLETE. Why does tcpdump show bad checksums on the sender?",
+  "a": "On receive, <code>CHECKSUM_UNNECESSARY</code> means hardware verified the L4 checksum, <code>CHECKSUM_COMPLETE</code> means it supplied the raw ones-complement sum in <code>skb-&gt;csum</code>, and <code>CHECKSUM_NONE</code> means software must verify. On transmit, <code>CHECKSUM_PARTIAL</code> asks the NIC to fill in the checksum using <code>csum_start</code> and <code>csum_offset</code>. tcpdump captures before the NIC does that, so offloaded outgoing packets show 'incorrect' checksums harmlessly."
+ },
+ {
+  "id": "n044",
+  "track": "Networking",
+  "topic": "TCP",
+  "q": "When does TCP send RST instead of FIN?",
+  "a": "RST is sent for a segment to a port with no listener, for segments that do not match any connection, when an application calls <code>close()</code> with unread data in its receive buffer, or when <code>SO_LINGER</code> is set with a zero timeout. FIN is the graceful close after all queued data. An RST skips TIME_WAIT on the sender, and the peer's next read or write fails with ECONNRESET or EPIPE."
+ },
+ {
+  "id": "n045",
+  "track": "Networking",
+  "topic": "Sockets",
+  "q": "What does calling connect() on a UDP socket do?",
+  "a": "No packet is sent. It records a default peer so <code>send()</code> and <code>recv()</code> work without addresses, filters incoming datagrams to that peer, caches the route, and makes asynchronous ICMP errors such as Port Unreachable visible: the next <code>send()</code> or <code>recv()</code> fails with ECONNREFUSED. Unconnected UDP sockets do not get those errors reported. Connecting to <code>AF_UNSPEC</code> dissolves the association."
+ },
+ {
+  "id": "e001",
+  "track": "Embedded",
+  "topic": "Boot",
+  "q": "How does the U-Boot environment work, and how do bootcmd and bootargs reach the kernel?",
+  "a": "U-Boot keeps variables such as <code>bootcmd</code>, <code>bootargs</code>, <code>bootdelay</code> and <code>serverip</code> in a reserved flash or eMMC area protected by a CRC, optionally with a redundant copy. After <code>bootdelay</code>, <code>bootcmd</code> runs automatically; <code>bootargs</code> becomes the kernel command line, written into the DTB's <code>/chosen</code> node. Edit with <code>printenv</code>, <code>setenv</code> and <code>saveenv</code>; from Linux use <code>fw_printenv</code>/<code>fw_setenv</code> configured by <code>/etc/fw_env.config</code>."
+ },
+ {
+  "id": "e002",
+  "track": "Embedded",
+  "topic": "Boot",
+  "q": "Describe a typical ARM boot sequence from power-on to init.",
+  "a": "The boot ROM loads a first stage (U-Boot SPL or a vendor loader such as TF-A BL2) into on-chip SRAM, which initializes DRAM and loads U-Boot proper; on arm64 TF-A BL31 and often OP-TEE are loaded too. U-Boot loads the kernel, DTB and optional initramfs, then jumps to the kernel with the DTB address in x0 (arm64) or r2 (arm32). The kernel mounts root and runs init."
+ },
+ {
+  "id": "e003",
+  "track": "Embedded",
+  "topic": "Boot",
+  "q": "What is the difference between an initramfs, the legacy initrd and the real root filesystem?",
+  "a": "An initramfs is a cpio archive, built into the kernel or passed by the bootloader, unpacked into a tmpfs-backed rootfs; the kernel executes its <code>/init</code>. It loads storage drivers, unlocks encrypted disks or assembles RAID, then <code>switch_root</code>s to the real root. The legacy initrd is a block-device image that needs a filesystem driver and RAM disk. Small embedded systems sometimes run entirely from initramfs."
+ },
+ {
+  "id": "e004",
+  "track": "Embedded",
+  "topic": "Boot",
+  "q": "What do root=, rootfstype=, rootwait and console= on the kernel command line do, and why is rootwait common on SD and eMMC boards?",
+  "a": "<code>root=</code> names the root device (<code>/dev/mmcblk0p2</code> or <code>PARTUUID=...</code>), <code>rootfstype=</code> skips filesystem probing, and <code>console=ttyS0,115200</code> picks the console and baud rate. <code>rootwait</code> makes the kernel wait indefinitely for the root device to appear. MMC and USB are probed asynchronously, so without it boot can panic with 'VFS: Unable to mount root fs'."
+ },
+ {
+  "id": "e005",
+  "track": "Embedded",
+  "topic": "Device tree",
+  "q": "How does a compatible string bind a device tree node to a driver, and what is a binding?",
+  "a": "The kernel matches a node's <code>compatible</code> list, ordered most specific first, against each driver's <code>of_match_table</code>, for example 'vendor,chip-v2', 'vendor,chip'. A binding, written as a YAML schema under <code>Documentation/devicetree/bindings</code>, defines required properties such as <code>reg</code>, <code>interrupts</code> and <code>clocks</code>; <code>make dt_binding_check</code> and <code>dtbs_check</code> validate them. The DT describes hardware, not driver policy, and is treated as stable ABI."
+ },
+ {
+  "id": "e006",
+  "track": "Embedded",
+  "topic": "Device tree",
+  "q": "What does status = \"okay\" mean in a device tree node, and how are SoC and board files usually organized around it?",
+  "a": "<code>status = \"okay\"</code> enables a node; <code>\"disabled\"</code> means the hardware exists but is unused, so no device is created and no driver probes. SoC <code>.dtsi</code> files typically mark peripherals disabled, and the board <code>.dts</code> enables what is actually wired with <code>&amp;uart2 { status = \"okay\"; };</code> plus pin and clock details. The legacy spelling <code>\"ok\"</code> is still accepted."
+ },
+ {
+  "id": "e007",
+  "track": "Embedded",
+  "topic": "Device tree",
+  "q": "How do #address-cells and #size-cells affect the reg property in a device tree?",
+  "a": "Set in the parent node, they state how many 32-bit cells encode each address and size in children's <code>reg</code>. With <code>&lt;2&gt;</code> and <code>&lt;2&gt;</code> on a 64-bit SoC bus, <code>reg = &lt;0x0 0xfe200000 0x0 0x1000&gt;</code>. An I2C controller uses <code>&lt;1&gt;</code> and <code>&lt;0&gt;</code>, so a child's <code>reg</code> is just its slave address. <code>ranges</code> translates child bus addresses to parent addresses; an empty <code>ranges</code> means identity."
+ },
+ {
+  "id": "e008",
+  "track": "Embedded",
+  "topic": "Device tree",
+  "q": "What does pinctrl do, and how does a device select its pin configuration?",
+  "a": "Pinctrl sets SoC pad multiplexing, choosing which peripheral or GPIO drives each pin, plus electrical settings such as pull-up or pull-down, drive strength and slew rate. Device nodes list states with <code>pinctrl-names = \"default\", \"sleep\"</code> and matching <code>pinctrl-0</code>, <code>pinctrl-1</code> phandles. The driver core applies \"default\" before probe automatically; drivers switch to \"sleep\" in suspend, often via <code>pinctrl_pm_select_sleep_state()</code>."
+ },
+ {
+  "id": "e009",
+  "track": "Embedded",
+  "topic": "Drivers",
+  "q": "Why are GPIO descriptors preferred over integer GPIO numbers, and how is active-low handled?",
+  "a": "The integer API (<code>gpio_request()</code>) is deprecated because global numbers are unstable. Descriptors come from firmware: <code>devm_gpiod_get(dev, \"reset\", GPIOD_OUT_LOW)</code> finds <code>reset-gpios</code> in DT. Values are logical: with <code>GPIO_ACTIVE_LOW</code> in DT, <code>gpiod_set_value(desc, 1)</code> drives the line low, meaning asserted. Use <code>_cansleep</code> variants for I2C expanders. Userspace should use <code>/dev/gpiochipN</code> via libgpiod, not sysfs."
+ },
+ {
+  "id": "e010",
+  "track": "Embedded",
+  "topic": "Drivers",
+  "q": "What is regmap, and what does it buy a driver?",
+  "a": "Regmap is a register access abstraction over I2C, SPI, MMIO and other buses with one API: <code>regmap_read()</code>, <code>regmap_write()</code>, <code>regmap_update_bits()</code>. It adds register caching (saving bus reads and enabling restore after suspend), locking, debugfs register dumps, readable/volatile register tables and value formatting and endianness. A chip offered with both I2C and SPI interfaces can share nearly all driver code."
+ },
+ {
+  "id": "e011",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "How does I2C addressing work, and why do datasheets sometimes disagree with i2cdetect?",
+  "a": "Most devices use 7-bit addresses, sent followed by a read/write bit, so device 0x50 appears on the wire as 0xA0 for write and 0xA1 for read. Some datasheets quote that 8-bit form, while Linux and i2cdetect use the 7-bit value. Addresses 0x00-0x07 and 0x78-0x7F are reserved. Conflicting addresses need address strap pins, a mux like the PCA9548, or separate buses."
+ },
+ {
+  "id": "e012",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "What are I2C clock stretching and repeated start, and when do they matter?",
+  "a": "Clock stretching: a slave holds SCL low to make the master wait until it is ready; some controllers handle it badly, notably the BCM2835. A repeated start issues a new START without a STOP, keeping bus ownership between writing a register address and reading data, so no other master intervenes. In Linux, <code>i2c_transfer()</code> with two <code>i2c_msg</code>s, or <code>i2c_smbus_read_byte_data()</code>, produces one."
+ },
+ {
+  "id": "e013",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "Why does I2C use open-drain lines with pull-up resistors, and how do you size them?",
+  "a": "Devices only pull SDA and SCL low and release them to float high via resistors. That wired-AND allows multi-master arbitration, clock stretching and ACKs without bus contention. The pull-up value trades rise time against sink current: bus capacitance (400 pF maximum) and speed set the upper limit. Typical values are 4.7 kOhm at 100 kHz and about 2.2 kOhm or lower at 400 kHz."
+ },
+ {
+  "id": "e014",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "Why does an SPI device need CPOL/CPHA settings, and what do they mean?",
+  "a": "SPI has no protocol-level negotiation, so master and slave must agree on clock idle level and sampling edge. CPOL sets the idle level of SCLK (0 low, 1 high). CPHA sets whether data is sampled on the first (0) or second (1) edge of each clock cycle. They combine into modes 0 to 3; modes 0 and 3 are most common. DT uses <code>spi-cpol</code> and <code>spi-cpha</code>."
+ },
+ {
+  "id": "e015",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "Compare SPI and I2C for a new peripheral design.",
+  "a": "SPI is full-duplex and push-pull, running at tens of MHz with simple shift registers, but needs one chip select per device and has no acknowledgement or standard addressing. I2C needs only two wires with addressing, ACK/NACK and multi-master support, but is slower (100 kHz, 400 kHz, 1 MHz Fast-mode Plus) and limited by rise time. Choose SPI for throughput such as displays and ADCs, I2C for sensors and configuration."
+ },
+ {
+  "id": "e016",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "Describe UART framing. What throughput does 115200 8N1 give?",
+  "a": "The line idles high. Each frame is a start bit (low), 5 to 9 data bits LSB first, optional parity and 1 or 2 stop bits (high). 8N1 means 10 bit-times per byte, so 115200 baud carries 11520 bytes per second. No clock is shared: the receiver detects the start edge and samples mid-bit, typically with 16x oversampling. A low stop bit causes a framing error."
+ },
+ {
+  "id": "e017",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "How much baud-rate error can a UART link tolerate, and how is the error calculated?",
+  "a": "The divisor from the peripheral clock is an integer, so the real rate deviates. Each start bit resynchronizes the receiver, so error accumulates over about 10 bits; mid-bit sampling fails near 5% total mismatch, so keep the combined error of both sides under about 2-3%. Example: 48 MHz / (16 x 115200) = 26.04; divisor 26 gives 115385 baud, 0.16% error."
+ },
+ {
+  "id": "e018",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "Explain CAN arbitration and the main differences between classic CAN and CAN FD.",
+  "a": "CAN is a multi-master differential bus (CAN_H/CAN_L) terminated with 120 Ohm at each end. Each frame has an 11-bit or 29-bit identifier; nodes transmit bit by bit and dominant 0 overrides recessive 1, so the lowest ID wins without losing a frame. Classic CAN carries up to 8 data bytes at up to 1 Mbit/s; CAN FD carries up to 64 at a faster data-phase bit rate. Linux uses SocketCAN."
+ },
+ {
+  "id": "e019",
+  "track": "Embedded",
+  "topic": "Buses",
+  "q": "What are CAN error-active, error-passive and bus-off states?",
+  "a": "Each node keeps transmit (TEC) and receive (REC) error counters. Below 128 a node is error-active and signals errors with dominant active error flags. Above 127 it becomes error-passive: it sends only recessive passive flags and waits extra before retransmitting. TEC above 255 means bus-off: the node stops transmitting. In SocketCAN, set <code>restart-ms</code> or run <code>ip link set can0 type can restart</code> to recover."
+ },
+ {
+  "id": "e020",
+  "track": "Embedded",
+  "topic": "Reliability",
+  "q": "How is a hardware watchdog used from Linux, and what does CONFIG_WATCHDOG_NOWAYOUT change?",
+  "a": "The watchdog resets the SoC unless it is pinged within its timeout. Linux exposes <code>/dev/watchdogN</code>; systemd (<code>RuntimeWatchdogSec</code>) or a daemon pings it via writes or <code>WDIOC_KEEPALIVE</code>. With magic-close support, closing the device stops the watchdog only if 'V' was written first, otherwise it keeps running; with <b>CONFIG_WATCHDOG_NOWAYOUT</b> it can never be stopped once started. Ping only after real health checks, or it proves nothing."
+ },
+ {
+  "id": "e021",
+  "track": "Embedded",
+  "topic": "DMA",
+  "q": "On a non-cache-coherent SoC, when must caches be cleaned or invalidated around DMA, and why does buffer alignment matter?",
+  "a": "Before a device reads memory (TX), dirty CPU cache lines must be cleaned to DRAM. Before the CPU reads what a device wrote (RX), its lines must be invalidated, or stale data is returned. Invalidating a line shared with unrelated data destroys that data, so DMA buffers must be cache-line aligned and padded. Drivers never do this by hand: <code>dma_map_single()</code> and <code>dma_sync_*()</code> handle it."
+ },
+ {
+  "id": "e022",
+  "track": "Embedded",
+  "topic": "DMA",
+  "q": "What is the difference between coherent and streaming DMA mappings, and when do you use each?",
+  "a": "<code>dma_alloc_coherent()</code> returns memory that CPU and device see consistently without syncs, often mapped uncached on non-coherent ARM; use it for descriptor rings and long-lived shared control structures. Streaming mappings (<code>dma_map_single()</code>, <code>dma_map_sg()</code>) map existing buffers for one transfer and direction. Ownership moves with <code>dma_sync_single_for_cpu()</code>/<code>_for_device()</code> and unmapping. Streaming suits bulk data buffers."
+ },
+ {
+  "id": "e023",
+  "track": "Embedded",
+  "topic": "DMA",
+  "q": "What does a DMA mask do, and why must drivers use the dma_addr_t returned by the DMA API instead of virt_to_phys()?",
+  "a": "<code>dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))</code> declares which bus addresses the device can generate. If a buffer lies outside that range, the DMA API remaps it through an IOMMU or bounces it through swiotlb buffers. Bus addresses can also differ from physical ones due to IOMMUs or bus offsets, so only the returned <code>dma_addr_t</code> is valid to program into the device."
+ },
+ {
+  "id": "e024",
+  "track": "Embedded",
+  "topic": "Architecture",
+  "q": "What is the difference between an MMU and an MPU, and can Linux run without an MMU?",
+  "a": "An MMU translates virtual to physical addresses through page tables, giving per-process address spaces, demand paging and protection, which standard Linux requires. An MPU, found on Cortex-M and Cortex-R, only enforces access permissions and attributes on a handful of physical regions with no translation; it suits RTOSes. Linux has a nommu mode for some cores, but without <code>fork()</code>, only <code>vfork()</code>."
+ },
+ {
+  "id": "e025",
+  "track": "Embedded",
+  "topic": "Storage",
+  "q": "Compare NAND and NOR flash for an embedded design.",
+  "a": "NOR is random-access and memory-mapped, supports execute-in-place and is very reliable, but costs more per bit and erases and writes slowly; it suits bootloaders. NAND is dense and cheap with fast writes, accessed by page and erased by block, ships with bad blocks and suffers bit errors requiring ECC. Raw NAND needs MTD plus UBI; eMMC hides NAND behind a controller with wear leveling."
+ },
+ {
+  "id": "e026",
+  "track": "Embedded",
+  "topic": "Storage",
+  "q": "What do UBI and UBIFS provide, and why should you not put UBIFS on eMMC?",
+  "a": "UBI runs on raw MTD flash and provides logical volumes with wear leveling across the whole chip, bad-block management and scrubbing of blocks showing bit flips. UBIFS is a journaling, power-cut-tolerant filesystem with compression that runs on UBI volumes. eMMC and SD cards are block devices with their own internal FTL, so UBI/UBIFS do not apply; use ext4 or f2fs there."
+ },
+ {
+  "id": "e027",
+  "track": "Embedded",
+  "topic": "Build systems",
+  "q": "In Yocto, what are layers, recipes and bbappend files?",
+  "a": "A layer (<code>meta-*</code>) groups recipes, classes and configuration and is listed in <code>bblayers.conf</code> with a priority. A recipe (<code>.bb</code>) describes how to fetch, patch, configure, compile and package one component. A <code>.bbappend</code> in your own layer modifies a recipe without editing it, for example <code>FILESEXTRAPATHS:prepend</code> plus <code>SRC_URI:append</code> to add patches. Since Honister (3.4), overrides use <code>:</code> instead of <code>_</code>."
+ },
+ {
+  "id": "e028",
+  "track": "Embedded",
+  "topic": "Build systems",
+  "q": "In Yocto, what do MACHINE, DISTRO and an image recipe define, and how does the sstate cache speed builds?",
+  "a": "<code>MACHINE</code> selects BSP configuration: CPU tuning, kernel, device trees and bootloader. <code>DISTRO</code> sets policy such as init system, C library and distro features. An image recipe like <code>core-image-minimal</code> lists the packages installed into the rootfs via <code>IMAGE_INSTALL</code>. The sstate cache stores task outputs keyed by a hash of their inputs, so unchanged tasks are restored instead of rebuilt."
+ },
+ {
+  "id": "e029",
+  "track": "Embedded",
+  "topic": "Build systems",
+  "q": "How do defconfigs and BR2_EXTERNAL work in Buildroot, and when would you pick Buildroot over Yocto?",
+  "a": "Configurations live in <code>configs/*_defconfig</code>: <code>make board_defconfig</code> loads one, <code>make menuconfig</code> edits it, <code>make savedefconfig</code> writes the minimal form back. <code>BR2_EXTERNAL</code> keeps custom packages, board files and defconfigs outside the Buildroot tree. There is no target package manager, and toolchain or major option changes need a full rebuild. It is simpler and faster for a single-product firmware image."
+ },
+ {
+  "id": "e030",
+  "track": "Embedded",
+  "topic": "Build systems",
+  "q": "What does a cross-toolchain triplet encode, and how do you cross-compile the kernel?",
+  "a": "A triplet such as <code>aarch64-linux-gnu</code> or <code>arm-linux-gnueabihf</code> encodes architecture, OS and ABI; 'hf' means hard-float calling convention. Build the kernel with <code>make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-</code>, or <code>LLVM=1</code> for Clang. Userspace needs a sysroot with matching headers and libraries, and binaries linked against a newer glibc than the target's fail to run."
+ },
+ {
+  "id": "e031",
+  "track": "Embedded",
+  "topic": "Architecture",
+  "q": "Why does endianness matter on ARM Linux, and which kernel helpers handle it?",
+  "a": "ARM cores are bi-endian, but Linux on ARM and arm64 is almost always little-endian, while network byte order is big-endian. Protocol fields and some peripherals need conversion: <code>htons()</code>/<code>ntohl()</code> in userspace, <code>cpu_to_be32()</code> and <code>le16_to_cpu()</code> in the kernel, with <code>__be32</code>/<code>__le16</code> types checked by sparse. <code>readl()</code>/<code>writel()</code> assume little-endian registers; use <code>ioread32be()</code> for big-endian ones."
+ },
+ {
+  "id": "e032",
+  "track": "Embedded",
+  "topic": "Drivers",
+  "q": "Why is enabling a clock split into clk_prepare() and clk_enable()?",
+  "a": "<code>clk_prepare()</code> may sleep, for example waiting for a PLL to lock or talking to an I2C clock chip, so it is called only in process context. <code>clk_enable()</code> must not sleep and may be called in atomic context, such as around a quick register access. <code>clk_prepare_enable()</code> does both. Clocks come from DT <code>clocks</code> and <code>clock-names</code> properties via <code>devm_clk_get()</code>."
+ },
+ {
+  "id": "e033",
+  "track": "Embedded",
+  "topic": "RT & PM",
+  "q": "How does runtime PM work in a driver, and how does it differ from system suspend?",
+  "a": "Runtime PM powers a device down while the system runs. The driver supplies <code>runtime_suspend</code>/<code>runtime_resume</code> callbacks, calls <code>pm_runtime_resume_and_get()</code> before touching hardware and <code>pm_runtime_put_autosuspend()</code> afterwards, with an autosuspend delay to avoid thrashing. A parent stays active while any child is active. System suspend (suspend-to-RAM) uses the separate <code>suspend</code>/<code>resume</code> callbacks in <code>dev_pm_ops</code>."
+ },
+ {
+  "id": "e034",
+  "track": "Embedded",
+  "topic": "RT & PM",
+  "q": "How do you measure and improve worst-case latency on a PREEMPT_RT system?",
+  "a": "Run <code>cyclictest</code>: SCHED_FIFO threads sleep until absolute deadlines with <code>clock_nanosleep()</code> and record wakeup latency; the maximum matters, not the average. Run it for hours under load such as stress-ng, hackbench and network traffic. Improve with <code>isolcpus</code>/<code>nohz_full</code>, IRQ affinity, limiting deep idle states and frequency scaling, and <code>mlockall()</code> plus preallocated memory in the RT application."
+ },
+ {
+  "id": "e035",
+  "track": "Embedded",
+  "topic": "RT & PM",
+  "q": "What do cpufreq and cpuidle governors do, and how can they hurt real-time latency?",
+  "a": "cpufreq performs DVFS, scaling frequency and voltage through governors such as schedutil (scheduler utilization driven), performance, powersave and ondemand. cpuidle chooses idle states, from WFI to deep power-off, through governors such as menu or teo, trading exit latency for savings. Deep states add wakeup latency and frequency ramps add jitter; constrain them with PM QoS, such as <code>/dev/cpu_dma_latency</code>."
+ },
+ {
+  "id": "c001",
+  "track": "C & systems",
+  "topic": "Alignment",
+  "q": "What is sizeof(struct {char a; int b; char c;}) on LP64, and why? How could you shrink it?",
+  "a": "12. <code>int</code> needs 4-byte alignment, so 3 padding bytes follow <code>a</code> and <code>b</code> sits at offset 4; <code>c</code> is at offset 8, followed by 3 trailing padding bytes so the size is a multiple of the struct's alignment (4) and array elements stay aligned. LP64 changes nothing here because <code>int</code> is still 4 bytes. Ordering members <code>int b; char a; char c;</code> gives 8."
+ },
+ {
+  "id": "c002",
+  "track": "C & systems",
+  "topic": "Concurrency",
+  "q": "What does volatile guarantee, and what doesn't it guarantee in multi-core code?",
+  "a": "<code>volatile</code> makes the compiler perform every access as written, without caching, merging or eliminating it, and keeps volatile accesses in program order relative to each other. That suits MMIO registers and <code>sig_atomic_t</code> flags set by signal handlers. It gives no atomicity for read-modify-write, no CPU memory ordering or barriers, and no ordering of ordinary accesses. For inter-thread synchronization use C11 atomics or kernel primitives."
+ },
+ {
+  "id": "c003",
+  "track": "C & systems",
+  "topic": "Pointers",
+  "q": "How do arrays and pointers differ in C, and when does an array not decay to a pointer?",
+  "a": "An array is a contiguous object; in most expressions it decays to a pointer to its first element. It does not decay as the operand of <code>sizeof</code>, unary <code>&amp;</code>, or when a string literal initializes a char array. Hence <code>sizeof(arr)</code> is the total size while <code>sizeof(ptr)</code> is the pointer size. Arrays cannot be assigned. A parameter declared <code>int a[]</code> is really <code>int *a</code>."
+ },
+ {
+  "id": "c004",
+  "track": "C & systems",
+  "topic": "Pointers",
+  "q": "Explain const int *p, int *const p, and const int *const p.",
+  "a": "<code>const int *p</code> (same as <code>int const *p</code>) is a pointer to const int: <code>p</code> can be reseated, <code>*p</code> cannot be modified through it. <code>int *const p</code> is a const pointer: it cannot be reseated, but <code>*p</code> can be written. <code>const int *const p</code> forbids both. Read declarations right to left. Casting away const and writing to an object defined const is undefined behavior."
+ },
+ {
+  "id": "c005",
+  "track": "C & systems",
+  "topic": "Pointers",
+  "q": "What does the restrict qualifier promise, and what happens if you break the promise?",
+  "a": "<code>restrict</code> (C99) promises that, during the pointer's scope, the object it accesses is accessed only through that pointer or values derived from it. The compiler can then avoid reloads and vectorize without runtime overlap checks, as in <code>memcpy(void *restrict, const void *restrict, size_t)</code>. Passing overlapping buffers breaks the promise and is undefined behavior; <code>memmove()</code> exists for overlapping copies."
+ },
+ {
+  "id": "c006",
+  "track": "C & systems",
+  "topic": "Storage classes",
+  "q": "What does static mean at file scope versus inside a function?",
+  "a": "At file scope, <code>static</code> gives internal linkage: the variable or function is invisible to other translation units, avoiding symbol clashes and enabling optimization. Inside a function, <code>static</code> gives static storage duration: the variable is initialized once, to zero if no initializer is given, and keeps its value between calls. That persistent state makes the function non-reentrant and not thread-safe without locking."
+ },
+ {
+  "id": "c007",
+  "track": "C & systems",
+  "topic": "Functions",
+  "q": "What does inline actually do in C, and why do headers use static inline?",
+  "a": "<code>inline</code> is only a hint: compilers may ignore it, and may inline functions not marked inline. In C99, a plain <code>inline</code> definition in a header provides no external definition, so if the compiler chooses not to inline you get an undefined-reference link error unless one file supplies an <code>extern</code> definition. <code>static inline</code> avoids this. The kernel uses <code>__always_inline</code> where inlining is required for correctness."
+ },
+ {
+  "id": "c008",
+  "track": "C & systems",
+  "topic": "Macros",
+  "q": "Why are multi-statement macros wrapped in do { ... } while (0), and what other macro pitfalls exist?",
+  "a": "The wrapper makes the macro a single statement that requires a trailing semicolon, so <code>if (x) MACRO(); else ...</code> compiles correctly; bare braces followed by <code>;</code> would orphan the else. Also parenthesize every parameter and the whole expansion, and beware arguments evaluated twice, as in <code>MAX(i++, j)</code>. GCC statement expressions with <code>typeof</code> or <code>__auto_type</code> avoid double evaluation."
+ },
+ {
+  "id": "c009",
+  "track": "C & systems",
+  "topic": "Bits",
+  "q": "Give expressions to set, clear, toggle and test bit n, check for a power of two, and isolate the lowest set bit.",
+  "a": "Set <code>x |= 1U &lt;&lt; n</code>, clear <code>x &amp;= ~(1U &lt;&lt; n)</code>, toggle <code>x ^= 1U &lt;&lt; n</code>, test <code>(x &gt;&gt; n) &amp; 1</code>. Power of two: <code>x &amp;&amp; !(x &amp; (x - 1))</code>. Isolate the lowest set bit with <code>x &amp; -x</code>; <code>x &amp; (x - 1)</code> clears it. Use unsigned operands: shifting 1 into an int's sign bit, or by the type width or more, is undefined."
+ },
+ {
+  "id": "c010",
+  "track": "C & systems",
+  "topic": "Bits",
+  "q": "How do you count the set bits in a 32-bit word, and what would you use in production code?",
+  "a": "Kernighan's loop <code>while (x) { x &amp;= x - 1; count++; }</code> iterates once per set bit. The SWAR method adds bit pairs, nibbles and bytes in parallel using masks 0x55555555, 0x33333333 and 0x0F0F0F0F, then multiplies by 0x01010101 and shifts right 24. In production use <code>__builtin_popcount()</code>, which emits POPCNT or CNT where available, or the kernel's <code>hweight32()</code>."
+ },
+ {
+  "id": "c011",
+  "track": "C & systems",
+  "topic": "Alignment",
+  "q": "Why is casting a uint8_t buffer pointer to uint32_t * and dereferencing it dangerous on embedded targets?",
+  "a": "The address may be unaligned. On ARMv5, Cortex-M0 and many DSPs unaligned loads fault or return rotated data; even where hardware supports them (ARMv7-A, x86), LDRD/LDM, atomics and device memory still fault, and the compiler may emit such instructions assuming alignment. It also breaks strict aliasing rules. Use <code>memcpy()</code> or the kernel's <code>get_unaligned_le32()</code>."
+ },
+ {
+  "id": "c012",
+  "track": "C & systems",
+  "topic": "Alignment",
+  "q": "What does __attribute__((packed)) do, and what are its costs?",
+  "a": "It removes padding so a struct matches a wire or hardware layout exactly. Members may become unaligned, so on strict-alignment targets the compiler emits slower byte-wise accesses. Taking a member's address produces an ordinary pointer the compiler assumes is aligned, which can fault later; GCC warns with <code>-Waddress-of-packed-member</code>. Packing does nothing for endianness, which still needs explicit conversion."
+ },
+ {
+  "id": "c013",
+  "track": "C & systems",
+  "topic": "Integers",
+  "q": "Given uint8_t a = 200, b = 100, what are the type and value of a + b, (uint8_t)(a + b), and ~a?",
+  "a": "Both operands are promoted to <code>int</code>, so <code>a + b</code> is int 300 with no overflow. Converting to <code>uint8_t</code> reduces modulo 256, giving 44. <code>~a</code> is int -201, not 55, so a test like <code>~a == 0x37</code> is false. Promotion also means <code>uint16_t * uint16_t</code> is computed as signed int and can overflow, which is undefined, with 32-bit int."
+ },
+ {
+  "id": "c014",
+  "track": "C & systems",
+  "topic": "Integers",
+  "q": "Why does the C comparison -1 less-than 1u evaluate to false, and where does this bite in real code?",
+  "a": "The usual arithmetic conversions convert a signed int to unsigned when both have the same rank, so -1 becomes UINT_MAX and the comparison is false. It commonly bites when comparing an <code>int</code> length or a function's -1 error return against <code>sizeof</code> or other <code>size_t</code> values. Enable <code>-Wsign-compare</code> (part of <code>-Wextra</code> in C), check for negatives first, and keep types consistent."
+ },
+ {
+  "id": "c015",
+  "track": "C & systems",
+  "topic": "UB",
+  "q": "What is the strict aliasing rule, and how do you safely reinterpret a float's bits as uint32_t?",
+  "a": "The compiler may assume an object is accessed only through its own type, compatible types or character types. Reading a float through <code>uint32_t *</code> is undefined, and at <code>-O2</code> the access may be reordered or eliminated. Use <code>memcpy(&amp;u, &amp;f, sizeof u)</code>, which compiles to a register move, or a union, which C permits but C++ does not. The Linux kernel builds with <code>-fno-strict-aliasing</code>."
+ },
+ {
+  "id": "c016",
+  "track": "C & systems",
+  "topic": "UB",
+  "q": "Why might the compiler delete an overflow check written as x + 1 less-than x, with signed int x?",
+  "a": "Signed overflow is undefined, so the compiler may assume it never happens; <code>x + 1 &lt; x</code> is then always false and the check disappears. Loops with int counters are similarly optimized assuming no wrap. Unsigned arithmetic wraps modulo 2^N by definition. Check beforehand (<code>x &gt; INT_MAX - y</code>) or use <code>__builtin_add_overflow()</code>. The kernel builds with <code>-fno-strict-overflow</code> to make wrapping well-defined."
+ },
+ {
+  "id": "c017",
+  "track": "C & systems",
+  "topic": "UB",
+  "q": "Why might a compiler remove a NULL check that comes after a pointer dereference?",
+  "a": "If code dereferences <code>p</code> and later tests <code>if (!p)</code>, the compiler reasons that the dereference would already be undefined behavior if p were NULL, so p must be non-NULL and the check is dead code. Exactly this enabled a 2009 Linux exploit in the tun driver. The kernel now builds with <code>-fno-delete-null-pointer-checks</code>. Always check before dereferencing."
+ },
+ {
+  "id": "c018",
+  "track": "C & systems",
+  "topic": "Memory",
+  "q": "Compare stack and heap allocation. What are typical stack limits in userspace and in the kernel?",
+  "a": "Stack storage is automatic: reserved by moving the stack pointer on function entry and released on return, fast but limited. Userspace main-thread stacks default to 8 MB (<code>ulimit -s</code>); kernel stacks are 16 KB on x86-64 and arm64. Heap memory from <code>malloc()</code> persists until <code>free()</code>, with allocator overhead and fragmentation. Never return a pointer to a local; avoid large locals and VLAs, which the kernel forbids."
+ },
+ {
+  "id": "c019",
+  "track": "C & systems",
+  "topic": "Memory",
+  "q": "Explain memory leaks, double frees and use-after-free. How do you detect them?",
+  "a": "A leak loses the last pointer to heap memory. A double free corrupts allocator metadata. A use-after-free touches freed memory that may already be reused, often an exploitable bug. Detect them with AddressSanitizer (<code>-fsanitize=address</code>) or Valgrind memcheck in userspace, and with KASAN, kmemleak and SLUB debug poisoning in the kernel. Clear ownership rules and setting pointers to NULL after free help."
+ },
+ {
+  "id": "c020",
+  "track": "C & systems",
+  "topic": "Concurrency",
+  "q": "What is the difference between a reentrant function and a thread-safe one?",
+  "a": "A reentrant function can be interrupted, for example by a signal handler or ISR, and safely called again before the first call completes: it uses only arguments and locals, with no static state or non-reentrant calls. A thread-safe function may protect shared state with locks, which makes it unsafe to reenter: a signal handler calling <code>malloc()</code> can deadlock. <code>strtok()</code> is neither; <code>strtok_r()</code> is reentrant."
+ },
+ {
+  "id": "c021",
+  "track": "C & systems",
+  "topic": "Concurrency",
+  "q": "Explain relaxed, acquire/release and seq_cst ordering in C11 atomics with a message-passing example.",
+  "a": "Relaxed gives atomicity only, no ordering. For message passing, the producer writes data then does a release store to a flag; a consumer whose acquire load sees the flag is guaranteed to see the data. seq_cst, the default, adds one total order over all seq_cst operations, which costs extra fences on some architectures; on x86 a seq_cst store needs XCHG or MFENCE while acquire/release are nearly free."
+ },
+ {
+  "id": "c022",
+  "track": "C & systems",
+  "topic": "Concurrency",
+  "q": "What is the ABA problem in lock-free code using compare-and-swap?",
+  "a": "A thread reads head pointer A and is preempted; others pop A, pop B, free them, and push a new node that reuses A's address. The CAS sees A again and succeeds even though the list changed, corrupting it. Mitigations: version-tagged pointers with double-width CAS, hazard pointers, epoch or RCU reclamation, or LL/SC (ARM LDXR/STXR), which fails on any intervening store."
+ },
+ {
+  "id": "c023",
+  "track": "C & systems",
+  "topic": "Concurrency",
+  "q": "What conditions are required for deadlock, and how do you prevent it in practice?",
+  "a": "The four Coffman conditions: mutual exclusion, hold and wait, no preemption, and circular wait. In practice you break circular wait with a documented global lock order, acquiring A before B everywhere, or use trylock with back-off. Avoid calling unknown callbacks while holding locks. Lockdep in the kernel and ThreadSanitizer or Helgrind in userspace detect ordering violations before they hang production."
+ },
+ {
+  "id": "c024",
+  "track": "C & systems",
+  "topic": "Linked lists",
+  "q": "How do you reverse a singly linked list in place?",
+  "a": "Walk the list with three pointers: <code>prev = NULL; while (cur) { next = cur-&gt;next; cur-&gt;next = prev; prev = cur; cur = next; } head = prev;</code> It runs in O(n) time and O(1) extra space. A recursive version uses O(n) stack, risky in kernel or embedded code with small stacks. Empty and single-node lists need no special case."
+ },
+ {
+  "id": "c025",
+  "track": "C & systems",
+  "topic": "Linked lists",
+  "q": "How does container_of() work, and why does the kernel embed list_head inside structures?",
+  "a": "<code>container_of(ptr, type, member)</code> subtracts <code>offsetof(type, member)</code> from a member's address to recover the enclosing structure. Embedding <code>struct list_head</code> in objects means no separate node allocations, one object can be on several lists, and a single generic list implementation serves every type. Iterate with <code>list_for_each_entry()</code>, and use <code>list_for_each_entry_safe()</code> when deleting during traversal."
+ },
+ {
+  "id": "c026",
+  "track": "C & systems",
+  "topic": "Linked lists",
+  "q": "How do you detect a cycle in a singly linked list, and find where it starts, using O(1) memory?",
+  "a": "Floyd's tortoise and hare: advance slow by one node and fast by two. If fast reaches NULL there is no cycle; if they meet, there is one. To find the cycle's entry, move one pointer back to the head and advance both one step at a time; they meet at the first node of the cycle. It needs O(n) time and no node marking."
+ },
+ {
+  "id": "c027",
+  "track": "C & systems",
+  "topic": "Pointers",
+  "q": "What does int (*fp[4])(int) declare, and how would you make it more readable?",
+  "a": "An array of four pointers to functions that take an <code>int</code> and return an <code>int</code>. Read inside out: <code>fp[4]</code> is an array, <code>*</code> makes its elements pointers, <code>(int)</code> makes them functions returning int. A typedef clarifies: <code>typedef int (*handler_t)(int); handler_t fp[4];</code>. Kernel ops tables such as <code>file_operations</code> are structs of function pointers, usually declared const."
+ },
+ {
+  "id": "c028",
+  "track": "C & systems",
+  "topic": "Pointers",
+  "q": "What happens with char *s = \"hi\"; s[0] = 'H'; and how does char s[] = \"hi\" differ?",
+  "a": "It is undefined behavior: <code>s</code> points to a string literal, typically placed in read-only <code>.rodata</code>, so the write usually segfaults. <code>char s[] = \"hi\";</code> instead creates a modifiable three-byte array initialized from the literal. Declare literal pointers as <code>const char *</code> so the compiler rejects writes; GCC's <code>-Wwrite-strings</code> warns about the non-const form."
+ },
+ {
+  "id": "c029",
+  "track": "C & systems",
+  "topic": "Embedded C",
+  "q": "What is wrong with *(volatile uint32_t *)REG |= BIT(3); on a microcontroller?",
+  "a": "It compiles to load, OR, store, which is not atomic: an ISR or another core modifying the same register between the load and store loses its update. Protect it with an interrupt-disabled section or lock, or use hardware set/clear registers such as the STM32 BSRR. It is also dangerous on registers with write-1-to-clear status bits, where writing back pending bits clears them unintentionally."
+ },
+ {
+  "id": "c030",
+  "track": "C & systems",
+  "topic": "Bits",
+  "q": "Why do kernel and firmware developers avoid C bit-fields for hardware register layouts?",
+  "a": "Bit-field allocation order, storage unit size, straddling, padding and the signedness of plain int fields are implementation-defined, so layouts differ between compilers, ABIs and endianness. The access width may also not match the register, such as a byte access to a 32-bit register. Drivers instead use explicit masks and shifts: <code>GENMASK()</code>, <code>FIELD_GET()</code> and <code>FIELD_PREP()</code> in the kernel."
+ }
+]
