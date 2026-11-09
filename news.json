@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-09T12:46+05:30",
+ "updated": "2026-11-10T04:14+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,31 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261105",
-   "date": "2026-11-05",
+   "version": "next-20261109",
+   "date": "2026-11-09",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261105"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261109"
   }
  ],
  "lwn": [
+  {
+   "t": "Git considers voting to determine its LLM policy",
+   "link": "https://lwn.net/Articles/1104195/",
+   "date": "2026-11-09T20:35+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Kernel prepatch 7.4-rc2",
+   "link": "https://lwn.net/Articles/1106300/",
+   "date": "2026-11-09T20:25+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "OpenIndiana 2026.10 released",
+   "link": "https://lwn.net/Articles/1106285/",
+   "date": "2026-11-09T19:39+05:30",
+   "subscriber": false
+  },
   {
    "t": "Asahi Linux 7.3 progress report",
    "link": "https://lwn.net/Articles/1105936/",
@@ -125,24 +143,6 @@
    "t": "LWN.net Weekly Edition for November 5, 2026",
    "link": "https://lwn.net/Articles/1103480/",
    "date": "2026-11-05T06:12+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Plasma X11 session removal surprises some Fedora users",
-   "link": "https://lwn.net/Articles/1105130/",
-   "date": "2026-11-04T22:03+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Bazzite 45 released",
-   "link": "https://lwn.net/Articles/1105395/",
-   "date": "2026-11-04T21:24+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Portable Python scripts with dependencies",
-   "link": "https://lwn.net/Articles/1104646/",
-   "date": "2026-11-04T20:15+05:30",
    "subscriber": true
   }
  ]
