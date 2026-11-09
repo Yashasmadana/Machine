@@ -1,12 +1,12 @@
 {
- "updated": "2026-11-08T23:37+05:30",
+ "updated": "2026-11-09T12:46+05:30",
  "kernels": [
   {
    "moniker": "mainline",
-   "version": "7.4-rc1",
-   "date": "2026-11-01",
+   "version": "7.4-rc2",
+   "date": "2026-11-09",
    "eol": false,
-   "link": "https://git.kernel.org/torvalds/h/v7.4-rc1"
+   "link": "https://git.kernel.org/torvalds/h/v7.4-rc2"
   },
   {
    "moniker": "stable",
