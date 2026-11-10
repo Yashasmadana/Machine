@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-10T13:18+05:30",
+ "updated": "2026-11-11T01:33+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -10,10 +10,10 @@
   },
   {
    "moniker": "stable",
-   "version": "7.3.3",
-   "date": "2026-11-06",
+   "version": "7.3.4",
+   "date": "2026-11-10",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.3"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.4"
   },
   {
    "moniker": "stable",
@@ -24,17 +24,17 @@
   },
   {
    "moniker": "longterm",
-   "version": "6.18.62",
-   "date": "2026-11-06",
+   "version": "6.18.63",
+   "date": "2026-11-10",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.62"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.63"
   },
   {
    "moniker": "longterm",
-   "version": "6.12.116",
-   "date": "2026-11-06",
+   "version": "6.12.117",
+   "date": "2026-11-10",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.116"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.117"
   },
   {
    "moniker": "longterm",
@@ -73,6 +73,24 @@
   }
  ],
  "lwn": [
+  {
+   "t": "Three new stable kernels for Tuesday",
+   "link": "https://lwn.net/Articles/1106569/",
+   "date": "2026-11-11T00:36+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Synaptics patent claims stop work on DisplayLink drivers",
+   "link": "https://lwn.net/Articles/1102549/",
+   "date": "2026-11-10T21:08+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Firefox 160 released",
+   "link": "https://lwn.net/Articles/1106542/",
+   "date": "2026-11-10T21:07+05:30",
+   "subscriber": false
+  },
   {
    "t": "Git considers voting to determine its LLM policy",
    "link": "https://lwn.net/Articles/1104195/",
@@ -126,24 +144,6 @@
    "link": "https://lwn.net/Articles/1105899/",
    "date": "2026-11-06T23:39+05:30",
    "subscriber": false
-  },
-  {
-   "t": "User namespaces + file capabilities = trouble",
-   "link": "https://lwn.net/Articles/1103429/",
-   "date": "2026-11-05T20:03+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Critical security vulnerability affects OpenSSH on Alpine Linux systems",
-   "link": "https://lwn.net/Articles/1105464/",
-   "date": "2026-11-05T17:09+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "LWN.net Weekly Edition for November 5, 2026",
-   "link": "https://lwn.net/Articles/1103480/",
-   "date": "2026-11-05T06:12+05:30",
-   "subscriber": true
   }
  ]
 }
