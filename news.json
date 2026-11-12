@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-12T13:17+05:30",
+ "updated": "2026-11-13T01:59+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,43 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261111",
-   "date": "2026-11-11",
+   "version": "next-20261112",
+   "date": "2026-11-12",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261111"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261112"
   }
  ],
  "lwn": [
+  {
+   "t": "Rust 1.100.0 released",
+   "link": "https://lwn.net/Articles/1107187/",
+   "date": "2026-11-13T00:39+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Glasswing overwhelms maintainers with underwhelming findings (VulnCheck)",
+   "link": "https://lwn.net/Articles/1107173/",
+   "date": "2026-11-12T21:56+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Introducing Polo: a Wayland MATE compositor",
+   "link": "https://lwn.net/Articles/1107152/",
+   "date": "2026-11-12T20:02+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "C++26 contract confusion",
+   "link": "https://lwn.net/Articles/1105400/",
+   "date": "2026-11-12T19:59+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Stenberg: 30 years of Internet transfers with curl",
+   "link": "https://lwn.net/Articles/1107151/",
+   "date": "2026-11-12T19:54+05:30",
+   "subscriber": false
+  },
   {
    "t": "LWN.net Weekly Edition for November 12, 2026",
    "link": "https://lwn.net/Articles/1105460/",
@@ -113,36 +143,6 @@
    "t": "Firefox 160 released",
    "link": "https://lwn.net/Articles/1106542/",
    "date": "2026-11-10T21:07+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Git considers voting to determine its LLM policy",
-   "link": "https://lwn.net/Articles/1104195/",
-   "date": "2026-11-09T20:35+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Kernel prepatch 7.4-rc2",
-   "link": "https://lwn.net/Articles/1106300/",
-   "date": "2026-11-09T20:25+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "OpenIndiana 2026.10 released",
-   "link": "https://lwn.net/Articles/1106285/",
-   "date": "2026-11-09T19:39+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Asahi Linux 7.3 progress report",
-   "link": "https://lwn.net/Articles/1105936/",
-   "date": "2026-11-07T15:19+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Amutable Foundations: A Technical Overview",
-   "link": "https://lwn.net/Articles/1105934/",
-   "date": "2026-11-07T15:02+05:30",
    "subscriber": false
   }
  ]
