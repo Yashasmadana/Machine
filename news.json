@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-13T12:55+05:30",
+ "updated": "2026-11-14T01:36+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,25 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261112",
-   "date": "2026-11-12",
+   "version": "next-20261113",
+   "date": "2026-11-13",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261112"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261113"
   }
  ],
  "lwn": [
+  {
+   "t": "25 years of Buildroot",
+   "link": "https://lwn.net/Articles/1103395/",
+   "date": "2026-11-13T22:05+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Announcing XRAID: declustered parity RAID for zoned XFS",
+   "link": "https://lwn.net/Articles/1107473/",
+   "date": "2026-11-13T20:09+05:30",
+   "subscriber": false
+  },
   {
    "t": "Rust 1.100.0 released",
    "link": "https://lwn.net/Articles/1107187/",
@@ -131,18 +143,6 @@
    "t": "Three new stable kernels for Tuesday",
    "link": "https://lwn.net/Articles/1106569/",
    "date": "2026-11-11T00:36+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Synaptics patent claims stop work on DisplayLink drivers",
-   "link": "https://lwn.net/Articles/1102549/",
-   "date": "2026-11-10T21:08+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Firefox 160 released",
-   "link": "https://lwn.net/Articles/1106542/",
-   "date": "2026-11-10T21:07+05:30",
    "subscriber": false
   }
  ]
