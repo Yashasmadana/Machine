@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-16T12:52+05:30",
+ "updated": "2026-11-17T04:04+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,31 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261113",
-   "date": "2026-11-13",
+   "version": "next-20261116",
+   "date": "2026-11-16",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261113"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261116"
   }
  ],
  "lwn": [
+  {
+   "t": "A new generation of futexes",
+   "link": "https://lwn.net/Articles/1102988/",
+   "date": "2026-11-16T20:36+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Manjaro Project e.V. non-profit organization created",
+   "link": "https://lwn.net/Articles/1107814/",
+   "date": "2026-11-16T20:22+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Kernel prepatch 7.4-rc3",
+   "link": "https://lwn.net/Articles/1107606/",
+   "date": "2026-11-16T14:37+05:30",
+   "subscriber": false
+  },
   {
    "t": "25 years of Buildroot",
    "link": "https://lwn.net/Articles/1103395/",
@@ -125,24 +143,6 @@
    "t": "Zellij 0.46 released",
    "link": "https://lwn.net/Articles/1106903/",
    "date": "2026-11-11T22:56+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "In Memoriam: Tim Peters 1952–2026",
-   "link": "https://lwn.net/Articles/1106901/",
-   "date": "2026-11-11T22:42+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Additional hardening for the glibc dynamic linker",
-   "link": "https://lwn.net/Articles/1105134/",
-   "date": "2026-11-11T20:05+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Three new stable kernels for Tuesday",
-   "link": "https://lwn.net/Articles/1106569/",
-   "date": "2026-11-11T00:36+05:30",
    "subscriber": false
   }
  ]
