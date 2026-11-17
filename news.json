@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-17T14:04+05:30",
+ "updated": "2026-11-18T02:53+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -10,10 +10,10 @@
   },
   {
    "moniker": "stable",
-   "version": "7.3.4",
-   "date": "2026-11-10",
+   "version": "7.3.5",
+   "date": "2026-11-17",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.4"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.5"
   },
   {
    "moniker": "stable",
@@ -24,17 +24,17 @@
   },
   {
    "moniker": "longterm",
-   "version": "6.18.63",
-   "date": "2026-11-10",
+   "version": "6.18.64",
+   "date": "2026-11-17",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.63"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.64"
   },
   {
    "moniker": "longterm",
-   "version": "6.12.117",
-   "date": "2026-11-10",
+   "version": "6.12.118",
+   "date": "2026-11-17",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.117"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.118"
   },
   {
    "moniker": "longterm",
@@ -73,6 +73,24 @@
   }
  ],
  "lwn": [
+  {
+   "t": "Redict deprecated in favor of Valkey",
+   "link": "https://lwn.net/Articles/1108155/",
+   "date": "2026-11-17T21:50+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Zellij manages terminal workspaces with style",
+   "link": "https://lwn.net/Articles/1106913/",
+   "date": "2026-11-17T20:57+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Three stable kernels for Tuesday",
+   "link": "https://lwn.net/Articles/1108142/",
+   "date": "2026-11-17T19:55+05:30",
+   "subscriber": false
+  },
   {
    "t": "A new generation of futexes",
    "link": "https://lwn.net/Articles/1102988/",
@@ -126,24 +144,6 @@
    "link": "https://lwn.net/Articles/1105400/",
    "date": "2026-11-12T19:59+05:30",
    "subscriber": true
-  },
-  {
-   "t": "Stenberg: 30 years of Internet transfers with curl",
-   "link": "https://lwn.net/Articles/1107151/",
-   "date": "2026-11-12T19:54+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "LWN.net Weekly Edition for November 12, 2026",
-   "link": "https://lwn.net/Articles/1105460/",
-   "date": "2026-11-12T05:53+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Zellij 0.46 released",
-   "link": "https://lwn.net/Articles/1106903/",
-   "date": "2026-11-11T22:56+05:30",
-   "subscriber": false
   }
  ]
 }
