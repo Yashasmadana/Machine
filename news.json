@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-18T02:53+05:30",
+ "updated": "2026-11-18T13:28+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,10 +66,10 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261116",
-   "date": "2026-11-16",
+   "version": "next-20261117",
+   "date": "2026-11-17",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261116"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261117"
   }
  ],
  "lwn": [
