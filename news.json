@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-18T13:28+05:30",
+ "updated": "2026-11-19T02:25+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,25 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261117",
-   "date": "2026-11-17",
+   "version": "next-20261118",
+   "date": "2026-11-18",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261117"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261118"
   }
  ],
  "lwn": [
+  {
+   "t": "NGINX2Root: Remote Code Execution vulnerabilities in nginx",
+   "link": "https://lwn.net/Articles/1108362/",
+   "date": "2026-11-18T21:43+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Julia 1.13 brings REPL improvements and more",
+   "link": "https://lwn.net/Articles/1108153/",
+   "date": "2026-11-18T21:26+05:30",
+   "subscriber": true
+  },
   {
    "t": "Redict deprecated in favor of Valkey",
    "link": "https://lwn.net/Articles/1108155/",
@@ -126,24 +138,6 @@
    "link": "https://lwn.net/Articles/1107187/",
    "date": "2026-11-13T00:39+05:30",
    "subscriber": false
-  },
-  {
-   "t": "Glasswing overwhelms maintainers with underwhelming findings (VulnCheck)",
-   "link": "https://lwn.net/Articles/1107173/",
-   "date": "2026-11-12T21:56+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Introducing Polo: a Wayland MATE compositor",
-   "link": "https://lwn.net/Articles/1107152/",
-   "date": "2026-11-12T20:02+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "C++26 contract confusion",
-   "link": "https://lwn.net/Articles/1105400/",
-   "date": "2026-11-12T19:59+05:30",
-   "subscriber": true
   }
  ]
 }
