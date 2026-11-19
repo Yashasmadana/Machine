@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-19T13:29+05:30",
+ "updated": "2026-11-20T02:31+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,37 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261118",
-   "date": "2026-11-18",
+   "version": "next-20261119",
+   "date": "2026-11-19",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261118"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261119"
   }
  ],
  "lwn": [
+  {
+   "t": "Added indirection allows for larger BPF programs",
+   "link": "https://lwn.net/Articles/1106537/",
+   "date": "2026-11-19T23:02+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "PostgreSQL 19 released",
+   "link": "https://lwn.net/Articles/1108561/",
+   "date": "2026-11-19T22:09+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "PHP 8.6.0 released",
+   "link": "https://lwn.net/Articles/1108555/",
+   "date": "2026-11-19T20:13+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Four PHP security releases including fixes for critical vulnerabilities",
+   "link": "https://lwn.net/Articles/1108552/",
+   "date": "2026-11-19T19:59+05:30",
+   "subscriber": false
+  },
   {
    "t": "LWN.net Weekly Edition for November 19, 2026",
    "link": "https://lwn.net/Articles/1107147/",
@@ -119,24 +143,6 @@
    "t": "Manjaro Project e.V. non-profit organization created",
    "link": "https://lwn.net/Articles/1107814/",
    "date": "2026-11-16T20:22+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Kernel prepatch 7.4-rc3",
-   "link": "https://lwn.net/Articles/1107606/",
-   "date": "2026-11-16T14:37+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "25 years of Buildroot",
-   "link": "https://lwn.net/Articles/1103395/",
-   "date": "2026-11-13T22:05+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Announcing XRAID: declustered parity RAID for zoned XFS",
-   "link": "https://lwn.net/Articles/1107473/",
-   "date": "2026-11-13T20:09+05:30",
    "subscriber": false
   }
  ]
