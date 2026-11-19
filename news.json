@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-19T02:25+05:30",
+ "updated": "2026-11-19T13:29+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -74,6 +74,12 @@
  ],
  "lwn": [
   {
+   "t": "LWN.net Weekly Edition for November 19, 2026",
+   "link": "https://lwn.net/Articles/1107147/",
+   "date": "2026-11-19T06:35+05:30",
+   "subscriber": true
+  },
+  {
    "t": "NGINX2Root: Remote Code Execution vulnerabilities in nginx",
    "link": "https://lwn.net/Articles/1108362/",
    "date": "2026-11-18T21:43+05:30",
@@ -131,12 +137,6 @@
    "t": "Announcing XRAID: declustered parity RAID for zoned XFS",
    "link": "https://lwn.net/Articles/1107473/",
    "date": "2026-11-13T20:09+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Rust 1.100.0 released",
-   "link": "https://lwn.net/Articles/1107187/",
-   "date": "2026-11-13T00:39+05:30",
    "subscriber": false
   }
  ]
