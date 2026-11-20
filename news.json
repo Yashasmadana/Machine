@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-20T13:19+05:30",
+ "updated": "2026-11-21T02:17+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,31 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261119",
-   "date": "2026-11-19",
+   "version": "next-20261120",
+   "date": "2026-11-20",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261119"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261120"
   }
  ],
  "lwn": [
+  {
+   "t": "Bringing the Agama installer to openSUSE Tumbleweed",
+   "link": "https://lwn.net/Articles/1107830/",
+   "date": "2026-11-20T20:19+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Beyls: Wrapping up LLVM's relicensing effort",
+   "link": "https://lwn.net/Articles/1108818/",
+   "date": "2026-11-20T20:05+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Vim Classic 8.3.1 released",
+   "link": "https://lwn.net/Articles/1108817/",
+   "date": "2026-11-20T19:47+05:30",
+   "subscriber": false
+  },
   {
    "t": "Added indirection allows for larger BPF programs",
    "link": "https://lwn.net/Articles/1106537/",
@@ -126,24 +144,6 @@
    "link": "https://lwn.net/Articles/1106913/",
    "date": "2026-11-17T20:57+05:30",
    "subscriber": true
-  },
-  {
-   "t": "Three stable kernels for Tuesday",
-   "link": "https://lwn.net/Articles/1108142/",
-   "date": "2026-11-17T19:55+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "A new generation of futexes",
-   "link": "https://lwn.net/Articles/1102988/",
-   "date": "2026-11-16T20:36+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Manjaro Project e.V. non-profit organization created",
-   "link": "https://lwn.net/Articles/1107814/",
-   "date": "2026-11-16T20:22+05:30",
-   "subscriber": false
   }
  ]
 }
