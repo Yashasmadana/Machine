@@ -1,19 +1,19 @@
 {
- "updated": "2026-11-23T01:29+05:30",
+ "updated": "2026-11-23T13:50+05:30",
  "kernels": [
   {
    "moniker": "mainline",
-   "version": "7.4-rc3",
-   "date": "2026-11-15",
+   "version": "7.4-rc4",
+   "date": "2026-11-22",
    "eol": false,
-   "link": "https://git.kernel.org/torvalds/h/v7.4-rc3"
+   "link": "https://git.kernel.org/torvalds/h/v7.4-rc4"
   },
   {
    "moniker": "stable",
-   "version": "7.3.5",
-   "date": "2026-11-17",
+   "version": "7.3.6",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.5"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v7.x/ChangeLog-7.3.6"
   },
   {
    "moniker": "stable",
@@ -24,45 +24,45 @@
   },
   {
    "moniker": "longterm",
-   "version": "6.18.64",
-   "date": "2026-11-17",
+   "version": "6.18.65",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.64"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.65"
   },
   {
    "moniker": "longterm",
-   "version": "6.12.118",
-   "date": "2026-11-17",
+   "version": "6.12.119",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.118"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.119"
   },
   {
    "moniker": "longterm",
-   "version": "6.6.162",
-   "date": "2026-11-06",
+   "version": "6.6.163",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.6.162"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.6.163"
   },
   {
    "moniker": "longterm",
-   "version": "6.1.192",
-   "date": "2026-11-06",
+   "version": "6.1.193",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.1.192"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.1.193"
   },
   {
    "moniker": "longterm",
-   "version": "5.15.225",
-   "date": "2026-11-06",
+   "version": "5.15.226",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.225"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.226"
   },
   {
    "moniker": "longterm",
-   "version": "5.10.274",
-   "date": "2026-11-06",
+   "version": "5.10.275",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.10.274"
+   "link": "https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.10.275"
   },
   {
    "moniker": "linux-next",
@@ -73,6 +73,12 @@
   }
  ],
  "lwn": [
+  {
+   "t": "Kernel prepatch 7.4-rc4",
+   "link": "https://lwn.net/Articles/1108900/",
+   "date": "2026-11-23T06:02+05:30",
+   "subscriber": false
+  },
   {
    "t": "Bringing the Agama installer to openSUSE Tumbleweed",
    "link": "https://lwn.net/Articles/1107830/",
@@ -138,12 +144,6 @@
    "link": "https://lwn.net/Articles/1108155/",
    "date": "2026-11-17T21:50+05:30",
    "subscriber": false
-  },
-  {
-   "t": "Zellij manages terminal workspaces with style",
-   "link": "https://lwn.net/Articles/1106913/",
-   "date": "2026-11-17T20:57+05:30",
-   "subscriber": true
   }
  ]
 }
