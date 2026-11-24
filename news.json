@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-23T13:50+05:30",
+ "updated": "2026-11-24T05:55+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,25 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261120",
-   "date": "2026-11-20",
+   "version": "next-20261123",
+   "date": "2026-11-23",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261120"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261123"
   }
  ],
  "lwn": [
+  {
+   "t": "CachyOS November 2026 release",
+   "link": "https://lwn.net/Articles/1109269/",
+   "date": "2026-11-23T19:51+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Seven stable kernels for Monday",
+   "link": "https://lwn.net/Articles/1108909/",
+   "date": "2026-11-23T18:53+05:30",
+   "subscriber": false
+  },
   {
    "t": "Kernel prepatch 7.4-rc4",
    "link": "https://lwn.net/Articles/1108900/",
@@ -131,18 +143,6 @@
    "t": "NGINX2Root: Remote Code Execution vulnerabilities in nginx",
    "link": "https://lwn.net/Articles/1108362/",
    "date": "2026-11-18T21:43+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Julia 1.13 brings REPL improvements and more",
-   "link": "https://lwn.net/Articles/1108153/",
-   "date": "2026-11-18T21:26+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "Redict deprecated in favor of Valkey",
-   "link": "https://lwn.net/Articles/1108155/",
-   "date": "2026-11-17T21:50+05:30",
    "subscriber": false
   }
  ]
