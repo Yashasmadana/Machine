@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-24T15:59+05:30",
+ "updated": "2026-11-25T04:18+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,19 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261123",
-   "date": "2026-11-23",
+   "version": "next-20261124",
+   "date": "2026-11-24",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261123"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261124"
   }
  ],
  "lwn": [
+  {
+   "t": "Firefox 161.0 released",
+   "link": "https://lwn.net/Articles/1109478/",
+   "date": "2026-11-24T21:48+05:30",
+   "subscriber": false
+  },
   {
    "t": "CachyOS November 2026 release",
    "link": "https://lwn.net/Articles/1109269/",
@@ -131,18 +137,6 @@
    "t": "Four PHP security releases including fixes for critical vulnerabilities",
    "link": "https://lwn.net/Articles/1108552/",
    "date": "2026-11-19T19:59+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "LWN.net Weekly Edition for November 19, 2026",
-   "link": "https://lwn.net/Articles/1107147/",
-   "date": "2026-11-19T06:35+05:30",
-   "subscriber": true
-  },
-  {
-   "t": "NGINX2Root: Remote Code Execution vulnerabilities in nginx",
-   "link": "https://lwn.net/Articles/1108362/",
-   "date": "2026-11-18T21:43+05:30",
    "subscriber": false
   }
  ]
