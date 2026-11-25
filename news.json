@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-25T14:46+05:30",
+ "updated": "2026-11-26T03:30+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,13 +66,31 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261124",
-   "date": "2026-11-24",
+   "version": "next-20261125",
+   "date": "2026-11-25",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261124"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261125"
   }
  ],
  "lwn": [
+  {
+   "t": "Dave Täht given the Jonathan B. Postel Service Award",
+   "link": "https://lwn.net/Articles/1109691/",
+   "date": "2026-11-25T23:46+05:30",
+   "subscriber": false
+  },
+  {
+   "t": "Tainting (or not) on manual driver binding",
+   "link": "https://lwn.net/Articles/1103714/",
+   "date": "2026-11-25T20:06+05:30",
+   "subscriber": true
+  },
+  {
+   "t": "Pop!_OS 26.04 LTS released",
+   "link": "https://lwn.net/Articles/1109662/",
+   "date": "2026-11-25T20:04+05:30",
+   "subscriber": false
+  },
   {
    "t": "Firefox 161.0 released",
    "link": "https://lwn.net/Articles/1109478/",
@@ -120,24 +138,6 @@
    "link": "https://lwn.net/Articles/1106537/",
    "date": "2026-11-19T23:02+05:30",
    "subscriber": true
-  },
-  {
-   "t": "PostgreSQL 19 released",
-   "link": "https://lwn.net/Articles/1108561/",
-   "date": "2026-11-19T22:09+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "PHP 8.6.0 released",
-   "link": "https://lwn.net/Articles/1108555/",
-   "date": "2026-11-19T20:13+05:30",
-   "subscriber": false
-  },
-  {
-   "t": "Four PHP security releases including fixes for critical vulnerabilities",
-   "link": "https://lwn.net/Articles/1108552/",
-   "date": "2026-11-19T19:59+05:30",
-   "subscriber": false
   }
  ]
 }
