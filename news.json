@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-26T14:26+05:30",
+ "updated": "2026-11-27T03:28+05:30",
  "kernels": [
   {
    "moniker": "mainline",
@@ -66,10 +66,10 @@
   },
   {
    "moniker": "linux-next",
-   "version": "next-20261125",
-   "date": "2026-11-25",
+   "version": "next-20261126",
+   "date": "2026-11-26",
    "eol": false,
-   "link": "https://git.kernel.org/next/linux-next/h/next-20261125"
+   "link": "https://git.kernel.org/next/linux-next/h/next-20261126"
   }
  ],
  "lwn": [
@@ -132,12 +132,6 @@
    "link": "https://lwn.net/Articles/1108817/",
    "date": "2026-11-20T19:47+05:30",
    "subscriber": false
-  },
-  {
-   "t": "Added indirection allows for larger BPF programs",
-   "link": "https://lwn.net/Articles/1106537/",
-   "date": "2026-11-19T23:02+05:30",
-   "subscriber": true
   }
  ]
 }
